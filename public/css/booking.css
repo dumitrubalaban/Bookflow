@@ -1,0 +1,479 @@
+/* Bookflow - Frontend Styles */
+
+/* Customizable via CSS custom properties — override in your theme */
+:root {
+    --bookflow-accent: #917236;
+    --bookflow-accent-rgb: 145, 114, 54;
+    --bookflow-bg: #111;
+    --bookflow-bg-alt: #1a1a1a;
+    --bookflow-border: #333;
+    --bookflow-border-alt: #444;
+    --bookflow-text: #fff;
+    --bookflow-text-muted: #888;
+    --bookflow-text-subtle: #999;
+    --bookflow-text-dim: #aaa;
+    --bookflow-text-faint: #ccc;
+    --bookflow-unavailable: #444;
+}
+
+.bookflow-booking-form {
+    margin: 20px 0;
+}
+
+.bookflow-hidden {
+    display: none !important;
+}
+
+.bookflow-section {
+    margin-bottom: 0;
+}
+
+.bookflow-section-title {
+    font-size: 16px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(var(--bookflow-accent-rgb), 0.3);
+    color: var(--bookflow-accent);
+}
+
+/* Calendar */
+.bookflow-calendar {
+    max-width: 400px;
+    background: var(--bookflow-bg);
+    border: 1px solid var(--bookflow-border);
+    padding: 20px;
+}
+
+.bookflow-calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+
+.bookflow-cal-month {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--bookflow-text);
+}
+
+.bookflow-cal-prev,
+.bookflow-cal-next {
+    background: none;
+    border: 1px solid var(--bookflow-border-alt);
+    color: var(--bookflow-text);
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.bookflow-cal-prev:hover,
+.bookflow-cal-next:hover {
+    border-color: var(--bookflow-accent);
+    color: var(--bookflow-accent);
+}
+
+.bookflow-calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: 5px;
+}
+
+.bookflow-weekday {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--bookflow-text-muted);
+    padding: 8px 0;
+}
+
+.bookflow-calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+.bookflow-day {
+    text-align: center;
+    padding: 10px 0;
+    font-size: 14px;
+    cursor: default;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+}
+
+.bookflow-day-empty {
+    visibility: hidden;
+}
+
+.bookflow-day-unavailable {
+    color: var(--bookflow-unavailable);
+}
+
+.bookflow-day[data-date] {
+    cursor: pointer;
+    color: var(--bookflow-text);
+}
+
+.bookflow-day[data-date]:hover {
+    border-color: var(--bookflow-accent);
+    color: var(--bookflow-accent);
+}
+
+.bookflow-day-selected {
+    background: var(--bookflow-accent) !important;
+    color: #fff !important;
+    border-color: var(--bookflow-accent) !important;
+}
+
+/* Time Slots */
+.bookflow-slots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+.bookflow-slot {
+    background: var(--bookflow-bg);
+    border: 1px solid var(--bookflow-border);
+    padding: 15px 12px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: var(--bookflow-text);
+}
+
+.bookflow-slot:hover {
+    border-color: var(--bookflow-accent);
+}
+
+.bookflow-slot-selected {
+    background: var(--bookflow-accent) !important;
+    border-color: var(--bookflow-accent) !important;
+    color: #fff !important;
+}
+
+.bookflow-slot-time {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.bookflow-slot-price {
+    font-size: 13px;
+    color: var(--bookflow-accent);
+}
+
+.bookflow-slot-selected .bookflow-slot-price {
+    color: #fff;
+}
+
+.bookflow-slot-avail {
+    font-size: 11px;
+    color: var(--bookflow-text-muted);
+}
+
+.bookflow-slot-selected .bookflow-slot-avail {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.bookflow-no-slots {
+    color: var(--bookflow-text-muted);
+    font-style: italic;
+}
+
+/* Resources */
+.bookflow-resources-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+}
+
+.bookflow-resource {
+    background: var(--bookflow-bg);
+    border: 1px solid var(--bookflow-border);
+    padding: 15px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: var(--bookflow-text);
+}
+
+.bookflow-resource:hover {
+    border-color: var(--bookflow-accent);
+}
+
+.bookflow-resource-selected {
+    background: var(--bookflow-accent) !important;
+    border-color: var(--bookflow-accent) !important;
+    color: #fff !important;
+}
+
+.bookflow-resource-name {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.bookflow-resource-detail {
+    font-size: 12px;
+    color: var(--bookflow-text-subtle);
+}
+
+.bookflow-resource-selected .bookflow-resource-detail {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.bookflow-resource-photo {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+    align-self: center;
+}
+
+.bookflow-resource-description {
+    font-size: 12px;
+    color: var(--bookflow-text-subtle);
+}
+
+.bookflow-resource-selected .bookflow-resource-description {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Person Types */
+.bookflow-person-types {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 400px;
+}
+
+.bookflow-person-type-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    padding: 12px 15px;
+    background: var(--bookflow-bg);
+    border: 1px solid var(--bookflow-border);
+}
+
+.bookflow-person-type-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.bookflow-person-type-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--bookflow-text);
+}
+
+.bookflow-person-type-cost {
+    font-size: 12px;
+    color: var(--bookflow-accent);
+}
+
+/* Persons */
+.bookflow-persons-input {
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+
+#bookflow-persons-section .bookflow-persons-input {
+    max-width: 160px;
+}
+
+.bookflow-persons-btn {
+    width: 38px;
+    height: 38px;
+    background: var(--bookflow-bg-alt);
+    border: 1px solid var(--bookflow-border);
+    color: var(--bookflow-text);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.bookflow-persons-btn:hover {
+    border-color: var(--bookflow-accent);
+    color: var(--bookflow-accent);
+}
+
+.bookflow-persons-input input[type="number"] {
+    width: 50px;
+    height: 38px;
+    text-align: center;
+    background: var(--bookflow-bg-alt);
+    border: 1px solid var(--bookflow-border);
+    border-left: none;
+    border-right: none;
+    color: var(--bookflow-text);
+    font-size: 16px;
+    font-weight: 700;
+    -moz-appearance: textfield;
+}
+
+.bookflow-persons-input input::-webkit-outer-spin-button,
+.bookflow-persons-input input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Contact Fields */
+.bookflow-form-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    max-width: 500px;
+}
+
+.bookflow-field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    color: var(--bookflow-text-dim);
+}
+
+.bookflow-field input,
+.bookflow-field textarea {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bookflow-bg);
+    border: 1px solid var(--bookflow-border);
+    color: var(--bookflow-text);
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.bookflow-field input:focus,
+.bookflow-field textarea:focus {
+    outline: none;
+    border-color: var(--bookflow-accent);
+}
+
+/* Price Summary */
+.bookflow-price-summary {
+    background: var(--bookflow-bg);
+    border: 1px solid var(--bookflow-border);
+    padding: 20px;
+    max-width: 400px;
+}
+
+.bookflow-summary-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    font-size: 14px;
+    color: var(--bookflow-text-faint);
+}
+
+.bookflow-summary-total {
+    border-top: 1px solid var(--bookflow-border);
+    margin-top: 8px;
+    padding-top: 12px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--bookflow-accent);
+}
+
+/* Loading */
+.bookflow-loading {
+    color: var(--bookflow-text-muted);
+    text-align: center;
+    padding: 20px;
+    font-style: italic;
+}
+
+/* Validation error */
+.bookflow-error {
+    outline: 2px solid #d9534f;
+    outline-offset: 4px;
+    animation: bookflow-shake 0.3s ease;
+}
+@keyframes bookflow-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+/* Light theme — override CSS custom properties */
+body.light-theme .bookflow-booking-form {
+    --bookflow-bg: #f9f9f9;
+    --bookflow-bg-alt: #f9f9f9;
+    --bookflow-border: #ddd;
+    --bookflow-border-alt: #ddd;
+    --bookflow-text: #333;
+    --bookflow-text-muted: #888;
+    --bookflow-text-subtle: #666;
+    --bookflow-text-dim: #555;
+    --bookflow-text-faint: #444;
+    --bookflow-unavailable: #bbb;
+}
+
+/* ── UI polish: error toast, empty/error states, keyboard focus ── */
+.bookflow-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%) translateY(16px);
+    max-width: min(92vw, 420px);
+    background: #1f1d1b;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 12px;
+    padding: 12px 18px;
+    font-size: 14px;
+    line-height: 1.4;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 99999;
+}
+.bookflow-toast--show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* Empty-month / error message inside the calendar grid */
+.bookflow-cal-message {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--bookflow-text-muted);
+    font-size: 13px;
+    padding: 24px 12px;
+}
+
+/* Keyboard focus ring for calendar days (accessibility) */
+.bookflow-day[role="button"]:focus-visible {
+    outline: 2px solid var(--bookflow-accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+    .bookflow-toast { transition: opacity 0.01s; }
+}
