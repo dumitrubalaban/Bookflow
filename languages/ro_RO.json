@@ -413,5 +413,10 @@
     "product.location_title": "Locație",
     "product.location_desc": "Atribuiți acest produs unei locații pentru a moșteni zilele de lucru, datele blocate și sărbătorile acesteia, în plus față de setările de mai sus.",
     "product.location_label": "Locație",
-    "product.location_none": "— Niciuna —"
+    "product.location_none": "— Niciuna —",
+    "product.is_gift_voucher": "Acesta este un voucher cadou",
+    "product.is_gift_voucher_desc": "Când o comandă pentru acest produs este finalizată, se generează un cod de reducere unic per unitate și se trimite prin email cumpărătorului.",
+    "email.subject.gift_voucher": "Voucherul dvs. cadou de la %s",
+    "email.body.gift_voucher": "Vă mulțumim pentru achiziție! Iată codul voucherului cadou — distribuiți-l cui îl va folosi sau valorificați-l dvs. la următoarea rezervare.",
+    "email.label.gift_voucher_note": "Introduceți acest cod în câmpul „Aveți un cupon?” la finalizarea comenzii. Valabil 12 luni."
 }

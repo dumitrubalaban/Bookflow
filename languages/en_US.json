@@ -425,5 +425,10 @@
     "product.location_title": "Location",
     "product.location_desc": "Assign this product to a location to inherit its working days, blocked dates, and holidays in addition to the settings above.",
     "product.location_label": "Location",
-    "product.location_none": "— None —"
+    "product.location_none": "— None —",
+    "product.is_gift_voucher": "This is a gift voucher",
+    "product.is_gift_voucher_desc": "When an order for this product is completed, a unique discount code is generated per unit and emailed to the buyer.",
+    "email.subject.gift_voucher": "Your gift voucher from %s",
+    "email.body.gift_voucher": "Thank you for your purchase! Here is your gift voucher code — share it with whoever will use it, or redeem it yourself on your next booking.",
+    "email.label.gift_voucher_note": "Enter this code in the \"Have a coupon?\" field at checkout. Valid for 12 months."
 }

@@ -85,6 +85,7 @@ function bookflow_init() {
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-booking.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-resources.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-extras.php';
+    require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-vouchers.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-locations.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-schedules.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-person-types.php';
@@ -122,6 +123,7 @@ function bookflow_init() {
     new Bookflow_Product_Type();
     new Bookflow_Resources();
     new Bookflow_Extras();
+    new Bookflow_Vouchers();
     new Bookflow_Locations();
     new Bookflow_Schedules();
     new Bookflow_Person_Types();
