@@ -128,6 +128,16 @@ class WC_Product_Booking extends WC_Product {
         return (int) (get_post_meta($this->get_id(), '_bookflow_max_advance', true) ?: 365);
     }
 
+    /**
+     * Percent of the total charged at checkout; the rest is collected later
+     * (cash/card on-site). 0 = full payment required (default, unchanged
+     * behavior for products that never set this).
+     */
+    public function get_deposit_percent() {
+        $percent = (float) (get_post_meta($this->get_id(), '_bookflow_deposit_percent', true) ?: 0);
+        return max(0, min(100, $percent));
+    }
+
     public function has_resources() {
         $resources = Bookflow_Resources::get_for_product($this->get_id());
         return !empty($resources);

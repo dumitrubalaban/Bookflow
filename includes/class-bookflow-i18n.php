@@ -115,7 +115,7 @@ class Bookflow_I18n {
      * @return array
      */
     public static function statuses() {
-        $slugs = ['pending', 'confirmed', 'paid', 'in-progress', 'completed', 'cancelled', 'refunded', 'no-show'];
+        $slugs = ['pending', 'confirmed', 'partially-paid', 'paid', 'in-progress', 'completed', 'cancelled', 'refunded', 'no-show'];
         $result = [];
         foreach ($slugs as $slug) {
             $result[$slug] = self::status($slug);

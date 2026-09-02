@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 define('BOOKFLOW_VERSION', '1.0.0');
-define('BOOKFLOW_DB_VERSION', '1.4.0');
+define('BOOKFLOW_DB_VERSION', '1.5.0');
 define('BOOKFLOW_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('BOOKFLOW_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('BOOKFLOW_PLUGIN_FILE', __FILE__);
@@ -36,14 +36,15 @@ define('BOOKFLOW_STATUSES', [
 
 // Status transitions: status => [allowed next statuses]
 define('BOOKFLOW_STATUS_TRANSITIONS', [
-    'pending'     => ['confirmed', 'cancelled', 'paid'],
-    'confirmed'   => ['paid', 'cancelled', 'no-show'],
-    'paid'        => ['confirmed', 'in-progress', 'cancelled', 'refunded'],
-    'in-progress' => ['completed', 'cancelled'],
-    'completed'   => ['refunded'],
-    'cancelled'   => ['pending'],
-    'refunded'    => [],
-    'no-show'     => ['refunded'],
+    'pending'         => ['confirmed', 'cancelled', 'paid', 'partially-paid'],
+    'confirmed'       => ['paid', 'cancelled', 'no-show', 'partially-paid'],
+    'partially-paid'  => ['paid', 'confirmed', 'cancelled', 'refunded'],
+    'paid'            => ['confirmed', 'in-progress', 'cancelled', 'refunded'],
+    'in-progress'     => ['completed', 'cancelled'],
+    'completed'       => ['refunded'],
+    'cancelled'       => ['pending'],
+    'refunded'        => [],
+    'no-show'         => ['refunded'],
 ]);
 
 /**
@@ -186,6 +187,8 @@ function bookflow_create_tables() {
         all_day tinyint(1) NOT NULL DEFAULT 0,
         persons_total int(11) NOT NULL DEFAULT 1,
         cost decimal(12,2) NOT NULL DEFAULT 0.00,
+        full_total decimal(12,2) NOT NULL DEFAULT 0.00,
+        deposit_amount decimal(12,2) NOT NULL DEFAULT 0.00,
         status varchar(20) NOT NULL DEFAULT 'pending',
         customer_name varchar(255) DEFAULT NULL,
         customer_email varchar(255) DEFAULT NULL,

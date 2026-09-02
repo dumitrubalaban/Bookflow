@@ -44,6 +44,7 @@
     "form.total": "Итого:",
     "status.pending": "Ожидание",
     "status.confirmed": "Подтверждено",
+    "status.partially_paid": "Внесён депозит",
     "status.paid": "Оплачено",
     "status.in_progress": "В процессе",
     "status.completed": "Завершено",
@@ -395,5 +396,7 @@
     "admin.delete_extra_confirm": "Удалить это дополнение?",
     "admin.no_extras": "Дополнения не найдены.",
     "admin.price": "Цена",
-    "cart.extras": "Дополнения"
+    "cart.extras": "Дополнения",
+    "cart.deposit_paid_now": "Депозит (оплачивается сейчас)",
+    "cart.balance_due": "Остаток при прибытии"
 }

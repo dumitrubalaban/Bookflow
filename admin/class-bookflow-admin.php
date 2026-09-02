@@ -182,7 +182,7 @@ class Bookflow_Admin {
 
         $status_colors = [
             'pending' => '#f0ad4e', 'confirmed' => '#5cb85c', 'paid' => '#337ab7',
-            'in-progress' => '#5bc0de', 'completed' => '#6c757d',
+            'partially-paid' => '#f0ad4e', 'in-progress' => '#5bc0de', 'completed' => '#6c757d',
             'cancelled' => '#d9534f', 'refunded' => '#999', 'no-show' => '#d9534f',
         ];
         $color = $status_colors[$booking->status] ?? '#999';
@@ -248,6 +248,16 @@ class Bookflow_Admin {
                                     <th><?php Bookflow_I18n::te('admin.cost'); ?></th>
                                     <td><strong><?php echo wp_kses_post(wc_price($booking->cost)); ?></strong></td>
                                 </tr>
+                                <?php if (!empty($booking->deposit_amount) && (float) $booking->deposit_amount > 0) : ?>
+                                <tr>
+                                    <th><?php Bookflow_I18n::te('cart.deposit_paid_now'); ?></th>
+                                    <td><?php echo wp_kses_post(wc_price($booking->deposit_amount)); ?></td>
+                                </tr>
+                                <tr>
+                                    <th><?php Bookflow_I18n::te('cart.balance_due'); ?></th>
+                                    <td><strong style="color:#d9534f;"><?php echo wp_kses_post(wc_price($booking->full_total - $booking->deposit_amount)); ?></strong></td>
+                                </tr>
+                                <?php endif; ?>
                                 <?php if ($booking->order_id) : ?>
                                 <tr>
                                     <th><?php Bookflow_I18n::te('admin.order'); ?></th>

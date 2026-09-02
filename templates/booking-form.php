@@ -168,6 +168,14 @@ $extras         = Bookflow_Extras::get_all('active');
                 <span><?php Bookflow_I18n::te('form.total'); ?></span>
                 <span id="bookflow-total-price">-</span>
             </div>
+            <div class="bookflow-summary-row bookflow-hidden" id="bookflow-deposit-row">
+                <span><?php Bookflow_I18n::te('cart.deposit_paid_now'); ?></span>
+                <span id="bookflow-deposit-amount">-</span>
+            </div>
+            <div class="bookflow-summary-row bookflow-hidden" id="bookflow-balance-row">
+                <span><?php Bookflow_I18n::te('cart.balance_due'); ?></span>
+                <span id="bookflow-balance-amount">-</span>
+            </div>
         </div>
         <?php if ($terms_text) : ?>
         <div class="bookflow-terms-block" id="bookflow-terms-block">

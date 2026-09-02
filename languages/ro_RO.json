@@ -44,6 +44,7 @@
     "form.total": "Total:",
     "status.pending": "În așteptare",
     "status.confirmed": "Confirmat",
+    "status.partially_paid": "Avans plătit",
     "status.paid": "Plătit",
     "status.in_progress": "În desfășurare",
     "status.completed": "Finalizat",
@@ -395,5 +396,7 @@
     "admin.delete_extra_confirm": "Ștergeți acest extra?",
     "admin.no_extras": "Niciun extra găsit.",
     "admin.price": "Preț",
-    "cart.extras": "Extra"
+    "cart.extras": "Extra",
+    "cart.deposit_paid_now": "Avans (plătit acum)",
+    "cart.balance_due": "Rest de plată la sosire"
 }

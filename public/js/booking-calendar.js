@@ -64,6 +64,10 @@
         els.pricePerPerson = document.getElementById('bookflow-price-per-person');
         els.summaryPersons = document.getElementById('bookflow-summary-persons');
         els.totalPrice = document.getElementById('bookflow-total-price');
+        els.depositRow = document.getElementById('bookflow-deposit-row');
+        els.depositAmount = document.getElementById('bookflow-deposit-amount');
+        els.balanceRow = document.getElementById('bookflow-balance-row');
+        els.balanceAmount = document.getElementById('bookflow-balance-amount');
         els.termsBox = document.getElementById('bookflow-terms-accepted');
         if (els.termsBox) {
             els.termsBox.addEventListener('change', function () {
@@ -1147,6 +1151,17 @@
             if (els.totalPrice) fadeUpdate(els.totalPrice, function () {
                 els.totalPrice.innerHTML = res.total_formatted;
             });
+            if (els.depositRow && els.balanceRow) {
+                if (res.deposit_amount_formatted) {
+                    els.depositRow.classList.remove('bookflow-hidden');
+                    els.balanceRow.classList.remove('bookflow-hidden');
+                    if (els.depositAmount) els.depositAmount.innerHTML = res.deposit_amount_formatted;
+                    if (els.balanceAmount) els.balanceAmount.innerHTML = res.balance_due_formatted;
+                } else {
+                    els.depositRow.classList.add('bookflow-hidden');
+                    els.balanceRow.classList.add('bookflow-hidden');
+                }
+            }
         });
     }
 

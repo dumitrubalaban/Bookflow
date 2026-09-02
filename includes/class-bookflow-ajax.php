@@ -117,12 +117,22 @@ class Bookflow_Ajax {
 
         $price_per_person = Bookflow_Pricing::get_price_for_slot($product_id, $date, $start_time);
 
+        $product = wc_get_product($product_id);
+        $deposit_percent = $product ? $product->get_deposit_percent() : 0;
+        $deposit_amount = null;
+        if ($deposit_percent > 0 && $deposit_percent < 100) {
+            $deposit_amount = round($total * $deposit_percent / 100, 2);
+        }
+
         wp_send_json_success([
             'price_per_person'           => $price_per_person,
             'price_per_person_formatted' => Bookflow_Pricing::format_price($price_per_person),
             'total'                      => $total,
             'total_formatted'            => Bookflow_Pricing::format_price($total),
             'persons'                    => $total_persons,
+            'deposit_amount'             => $deposit_amount,
+            'deposit_amount_formatted'   => $deposit_amount !== null ? Bookflow_Pricing::format_price($deposit_amount) : null,
+            'balance_due_formatted'      => $deposit_amount !== null ? Bookflow_Pricing::format_price($total - $deposit_amount) : null,
         ]);
     }
 

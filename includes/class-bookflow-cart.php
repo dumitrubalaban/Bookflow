@@ -47,6 +47,8 @@ class Bookflow_Cart {
         $hidden[] = '_bookflow_terms_accepted';
         $hidden[] = '_bookflow_terms_accepted_at';
         $hidden[] = '_bookflow_extras';
+        $hidden[] = '_bookflow_full_total';
+        $hidden[] = '_bookflow_deposit_amount';
         $hidden[] = 'Persoane';
         return $hidden;
     }
@@ -209,6 +211,19 @@ class Bookflow_Cart {
             $cart_item_data['bookflow_cost'] = Bookflow_Pricing::calculate_total($product_id, $date, $time, $persons, $resource_id, $extra_ids_for_pricing);
         }
 
+        // Deposit: charge only a percentage now, collect the rest on-site.
+        // Only the WooCommerce-charged amount changes (bookflow_cost) — the
+        // full total is kept separately so order meta and the booking record
+        // both know the true price and outstanding balance.
+        $deposit_percent = $product->get_deposit_percent();
+        $cart_item_data['bookflow_full_total'] = $cart_item_data['bookflow_cost'];
+        if ($deposit_percent > 0 && $deposit_percent < 100) {
+            $cart_item_data['bookflow_deposit_amount'] = round($cart_item_data['bookflow_cost'] * $deposit_percent / 100, 2);
+            $cart_item_data['bookflow_cost'] = $cart_item_data['bookflow_deposit_amount'];
+        } else {
+            $cart_item_data['bookflow_deposit_amount'] = 0;
+        }
+
         // Unique key to allow multiple bookings in cart
         $cart_item_data['unique_key'] = md5($product_id . $date . $time . microtime());
 
@@ -250,6 +265,17 @@ class Bookflow_Cart {
             $item_data[] = [
                 'key'   => Bookflow_I18n::t('cart.extras'),
                 'value' => esc_html(implode(', ', wp_list_pluck($cart_item['bookflow_extras'], 'title'))),
+            ];
+        }
+        if (!empty($cart_item['bookflow_deposit_amount'])) {
+            $balance = $cart_item['bookflow_full_total'] - $cart_item['bookflow_deposit_amount'];
+            $item_data[] = [
+                'key'   => Bookflow_I18n::t('cart.deposit_paid_now'),
+                'value' => wp_kses_post(wc_price($cart_item['bookflow_deposit_amount'])),
+            ];
+            $item_data[] = [
+                'key'   => Bookflow_I18n::t('cart.balance_due'),
+                'value' => wp_kses_post(wc_price($balance)),
             ];
         }
         if (!empty($cart_item['bookflow_customer_name'])) {
@@ -326,6 +352,14 @@ class Bookflow_Cart {
         if (!empty($values['bookflow_person_types'])) {
             $item->add_meta_data('_bookflow_person_types', $values['bookflow_person_types']);
         }
+
+        if (!empty($values['bookflow_deposit_amount'])) {
+            $balance = $values['bookflow_full_total'] - $values['bookflow_deposit_amount'];
+            $item->add_meta_data(Bookflow_I18n::t('cart.deposit_paid_now'), wc_price($values['bookflow_deposit_amount']));
+            $item->add_meta_data(Bookflow_I18n::t('cart.balance_due'), wc_price($balance));
+            $item->add_meta_data('_bookflow_full_total', $values['bookflow_full_total']);
+            $item->add_meta_data('_bookflow_deposit_amount', $values['bookflow_deposit_amount']);
+        }
     }
 
     /**
@@ -347,6 +381,8 @@ class Bookflow_Cart {
             $resource_id = $item->get_meta('_bookflow_resource_id');
             $schedule_id = $item->get_meta('_bookflow_schedule_id');
             $tour_lang   = $item->get_meta('_bookflow_tour_language');
+            $deposit_amount = (float) $item->get_meta('_bookflow_deposit_amount');
+            $full_total = (float) $item->get_meta('_bookflow_full_total');
 
             $booking_data = [
                 'product_id'      => $item->get_product_id(),
@@ -358,6 +394,8 @@ class Bookflow_Cart {
                 'start_time'      => $item->get_meta('_bookflow_start_time'),
                 'persons_total'   => (int) $item->get_meta('_bookflow_persons_total'),
                 'cost'            => (float) $item->get_total(),
+                'full_total'      => $full_total ?: (float) $item->get_total(),
+                'deposit_amount'  => $deposit_amount,
                 'status'          => 'pending',
                 'customer_name'   => $item->get_meta('_bookflow_customer_name') ?: $order->get_formatted_billing_full_name(),
                 'customer_email'  => $item->get_meta('_bookflow_customer_email') ?: $order->get_billing_email(),
@@ -404,7 +442,15 @@ class Bookflow_Cart {
     private function update_bookings_status($order_id, $status) {
         $bookings = Bookflow_Booking::query(['order_id' => $order_id]);
         foreach ($bookings as $booking) {
-            Bookflow_Booking::transition_status($booking->id, $status);
+            // A deposit booking that just got its payment captured is only
+            // "partially-paid", not fully "paid" — the balance is still due
+            // on-site. Only applies to the 'paid' transition (order going to
+            // WC "processing"); confirm/cancel/refund are unaffected.
+            $target = $status;
+            if ($status === 'paid' && (float) $booking->deposit_amount > 0 && $booking->status !== 'partially-paid') {
+                $target = 'partially-paid';
+            }
+            Bookflow_Booking::transition_status($booking->id, $target);
         }
     }
 }

@@ -44,6 +44,7 @@
     "form.total": "Total:",
     "status.pending": "Pending",
     "status.confirmed": "Confirmed",
+    "status.partially_paid": "Partially Paid",
     "status.paid": "Paid",
     "status.in_progress": "In Progress",
     "status.completed": "Completed",
@@ -407,5 +408,7 @@
     "admin.delete_extra_confirm": "Delete this extra?",
     "admin.no_extras": "No extras found.",
     "admin.price": "Price",
-    "cart.extras": "Extras"
+    "cart.extras": "Extras",
+    "cart.deposit_paid_now": "Deposit (paid now)",
+    "cart.balance_due": "Balance due on arrival"
 }

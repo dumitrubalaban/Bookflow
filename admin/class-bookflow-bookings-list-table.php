@@ -130,7 +130,12 @@ class Bookflow_Bookings_List_Table extends WP_List_Table {
     }
 
     protected function column_total($item) {
-        return wp_kses_post(wc_price($item->cost));
+        $html = wp_kses_post(wc_price($item->cost));
+        if (!empty($item->deposit_amount) && (float) $item->deposit_amount > 0) {
+            $balance = (float) $item->full_total - (float) $item->deposit_amount;
+            $html .= '<br><small style="color:#d9534f;">' . esc_html(Bookflow_I18n::t('cart.balance_due')) . ': ' . wp_kses_post(wc_price($balance)) . '</small>';
+        }
+        return $html;
     }
 
     protected function column_status($item) {
