@@ -524,6 +524,14 @@ class Bookflow_REST_API {
             $args['tag'] = [sanitize_title($location)];
         }
 
+        $location_id = absint($request->get_param('location_id'));
+        if ($location_id) {
+            $args['meta_query'] = [[
+                'key'   => '_bookflow_location_id',
+                'value' => $location_id,
+            ]];
+        }
+
         $products = wc_get_products($args);
         $result = [];
 
@@ -558,41 +566,27 @@ class Bookflow_REST_API {
     }
 
     /**
-     * Distinct product tags actually used on bookable products — the set
-     * of "locations" a location-picking step has to offer. Empty for any
+     * Active locations (first-class entity — Bookflow_Locations), the set
+     * a location-picking wizard step has to offer. Empty for any
      * single-location store, which is how a widget knows to skip the step.
      */
     public function get_locations($request) {
-        $products = wc_get_products([
-            'type'   => 'booking',
-            'status' => 'publish',
-            'limit'  => -1,
-        ]);
+        $locations = Bookflow_Locations::get_all('active');
 
-        $seen = [];
-        $result = [];
-        foreach ($products as $product) {
-            $terms = get_the_terms($product->get_id(), 'product_tag');
-            if (empty($terms) || is_wp_error($terms)) {
-                continue;
+        $result = array_map(function ($loc) {
+            $slug = '';
+            if ($loc->term_id) {
+                $term = get_term($loc->term_id, 'product_tag');
+                $slug = ($term && !is_wp_error($term)) ? $term->slug : '';
             }
-            foreach ($terms as $term) {
-                if (isset($seen[$term->term_id])) {
-                    continue;
-                }
-                $seen[$term->term_id] = true;
-                $address = get_term_meta($term->term_id, '_bookflow_location_address', true);
-                $lat     = get_term_meta($term->term_id, '_bookflow_location_lat', true);
-                $lng     = get_term_meta($term->term_id, '_bookflow_location_lng', true);
-                $result[] = [
-                    'id'      => $term->term_id,
-                    'name'    => $term->name,
-                    'slug'    => $term->slug,
-                    'address' => $address ?: '',
-                    'mapUrl'  => Bookflow_Locations::get_map_url($lat, $lng),
-                ];
-            }
-        }
+            return [
+                'id'      => (int) $loc->id,
+                'name'    => $loc->name,
+                'slug'    => $slug,
+                'address' => $loc->address ?: '',
+                'mapUrl'  => Bookflow_Locations::get_map_url($loc->lat, $loc->lng),
+            ];
+        }, $locations);
 
         return rest_ensure_response($result);
     }
@@ -620,6 +614,7 @@ class Bookflow_REST_API {
 
         $loc_terms = get_the_terms($product_id, 'product_tag');
         $current_location = (!empty($loc_terms) && !is_wp_error($loc_terms)) ? current($loc_terms)->slug : null;
+        $current_location_id = (int) get_post_meta($product_id, '_bookflow_location_id', true) ?: null;
 
         return rest_ensure_response([
             'productId'       => $product_id,
@@ -651,6 +646,7 @@ class Bookflow_REST_API {
                 ];
             }, $schedules),
             'currentLocation' => $current_location,
+            'currentLocationId' => $current_location_id,
         ]);
     }
 

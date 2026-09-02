@@ -368,8 +368,8 @@
 
         var html = '';
         locations.forEach(function (loc) {
-            var isCurrent = bookflowBooking.currentLocation && loc.slug === bookflowBooking.currentLocation;
-            html += '<button type="button" class="bookflow-location' + (isCurrent ? ' bookflow-location-selected' : '') + '" data-slug="' + escapeAttr(loc.slug) + '">';
+            var isCurrent = bookflowBooking.currentLocationId && loc.id === bookflowBooking.currentLocationId;
+            html += '<button type="button" class="bookflow-location' + (isCurrent ? ' bookflow-location-selected' : '') + '" data-id="' + loc.id + '" data-slug="' + escapeAttr(loc.slug) + '">';
             html += '<span class="bookflow-location-name">' + escapeHtml(loc.name) + '</span>';
             if (loc.address) {
                 html += '<span class="bookflow-location-address">' + escapeHtml(loc.address) + '</span>';
@@ -385,6 +385,7 @@
 
         els.locationsGrid.querySelectorAll('.bookflow-location').forEach(function (btn) {
             btn.addEventListener('click', function () {
+                var id = parseInt(btn.dataset.id, 10);
                 var slug = btn.dataset.slug;
                 els.locationsGrid.querySelectorAll('.bookflow-location').forEach(function (b) {
                     b.classList.remove('bookflow-location-selected');
@@ -393,18 +394,18 @@
                 state.selectedLocationTag = slug;
                 if (els.locationInput) els.locationInput.value = slug;
 
-                if (bookflowBooking.currentLocation && slug === bookflowBooking.currentLocation) {
+                if (bookflowBooking.currentLocationId && id === bookflowBooking.currentLocationId) {
                     nextStep();
                     return;
                 }
-                swapToLocation(slug);
+                swapToLocation(id);
             });
         });
     }
 
-    function swapToLocation(slug) {
+    function swapToLocation(locationId) {
         els.locationsGrid.classList.add('bookflow-loading-overlay');
-        restFetch('services?location=' + encodeURIComponent(slug)).then(function (services) {
+        restFetch('services?location_id=' + encodeURIComponent(locationId)).then(function (services) {
             var svc = (services || [])[0];
             if (!svc) throw new Error('no_service_for_location');
             return restFetch('booking-data/' + svc.id);
@@ -417,6 +418,7 @@
             bookflowBooking.hasSchedules = data.hasSchedules;
             bookflowBooking.schedules = data.schedules;
             bookflowBooking.currentLocation = data.currentLocation;
+            bookflowBooking.currentLocationId = data.currentLocationId;
 
             // Reset dependent state for the new product
             state.selectedSchedule = null;

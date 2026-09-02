@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 define('BOOKFLOW_VERSION', '1.0.0');
-define('BOOKFLOW_DB_VERSION', '1.5.0');
+define('BOOKFLOW_DB_VERSION', '1.6.0');
 define('BOOKFLOW_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('BOOKFLOW_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('BOOKFLOW_PLUGIN_FILE', __FILE__);
@@ -332,6 +332,28 @@ function bookflow_create_tables() {
         KEY product_id (product_id),
         KEY option_group (option_group),
         KEY product_group (product_id, option_group),
+        KEY status (status)
+    ) $charset_collate;");
+
+    // Locations (first-class entity: own working days/blocked dates/holidays,
+    // replacing product_tag term-meta as the source of truth for scheduling;
+    // the tag itself is kept in sync for the existing /services?location=
+    // catalog filter, not used for availability logic any more)
+    dbDelta("CREATE TABLE {$wpdb->prefix}bookflow_locations (
+        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+        name varchar(255) NOT NULL,
+        term_id bigint(20) unsigned DEFAULT NULL,
+        address varchar(500) DEFAULT NULL,
+        lat varchar(30) DEFAULT NULL,
+        lng varchar(30) DEFAULT NULL,
+        available_days text DEFAULT NULL,
+        blocked_dates text DEFAULT NULL,
+        holidays text DEFAULT NULL,
+        sort_order int(11) NOT NULL DEFAULT 0,
+        status varchar(20) NOT NULL DEFAULT 'active',
+        created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY term_id (term_id),
         KEY status (status)
     ) $charset_collate;");
 

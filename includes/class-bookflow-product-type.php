@@ -305,6 +305,21 @@ class Bookflow_Product_Type {
         echo '</div>';
 
         echo '<div class="options_group">';
+        echo '<h4 style="padding-left:12px;">' . esc_html(Bookflow_I18n::t('product.location_title')) . '</h4>';
+        echo '<p style="padding-left:12px;" class="description">' . esc_html(Bookflow_I18n::t('product.location_desc')) . '</p>';
+
+        $current_location_id = (int) get_post_meta($product_id, '_bookflow_location_id', true);
+        $locations = Bookflow_Locations::get_all('active');
+        echo '<p class="form-field"><label for="_bookflow_location_id" style="display:inline-block;width:150px;">' . esc_html(Bookflow_I18n::t('product.location_label')) . '</label>';
+        echo '<select name="_bookflow_location_id" id="_bookflow_location_id">';
+        echo '<option value="0">' . esc_html(Bookflow_I18n::t('product.location_none')) . '</option>';
+        foreach ($locations as $loc) {
+            echo '<option value="' . esc_attr($loc->id) . '" ' . selected($current_location_id, $loc->id, false) . '>' . esc_html($loc->name) . '</option>';
+        }
+        echo '</select></p>';
+        echo '</div>';
+
+        echo '<div class="options_group">';
         echo '<h4 style="padding-left:12px;">' . esc_html(Bookflow_I18n::t('product.terms_title')) . '</h4>';
         echo '<p style="padding-left:12px;" class="description">' . esc_html(Bookflow_I18n::t('product.terms_desc')) . '</p>';
 
@@ -390,6 +405,7 @@ class Bookflow_Product_Type {
             '_bookflow_max_advance', '_bookflow_cancel_before_hours', '_bookflow_time_slots',
             '_bookflow_base_price', '_bookflow_blocked_dates', '_bookflow_date_range_from',
             '_bookflow_date_range_to', '_bookflow_terms_text', '_bookflow_deposit_percent',
+            '_bookflow_location_id',
         ];
 
         foreach ($fields as $field) {

@@ -90,6 +90,7 @@ class Bookflow_Frontend {
 
         $loc_terms = get_the_terms($post->ID, 'product_tag');
         $current_location = (!empty($loc_terms) && !is_wp_error($loc_terms)) ? current($loc_terms)->slug : null;
+        $current_location_id = (int) get_post_meta($post->ID, '_bookflow_location_id', true) ?: null;
 
         $schedules_data = array_map(function ($s) {
             return [
@@ -110,6 +111,7 @@ class Bookflow_Frontend {
             'restUrl'         => esc_url_raw(rest_url('bookflow/v1/')),
             'restNonce'       => wp_create_nonce('wp_rest'),
             'currentLocation' => $current_location,
+            'currentLocationId' => $current_location_id,
             'productId'       => $post->ID,
             'minPersons'      => $product->get_min_persons(),
             'maxPersons'      => $product->get_max_persons(),

@@ -75,7 +75,44 @@ class Bookflow_Availability {
             return false;
         }
 
+        // Location: the product must ALSO satisfy its assigned location's
+        // own working days/blocked dates/holidays, if any.
+        $location_id = (int) get_post_meta($product_id, '_bookflow_location_id', true);
+        if ($location_id && !self::is_date_available_for_location($location_id, $date, $day_of_week)) {
+            return false;
+        }
+
         return apply_filters('bookflow_is_date_available', true, $product_id, $date, $schedule_id);
+    }
+
+    /**
+     * Whether a date is open at the given location: its own working days
+     * (only enforced if the location defines any — an empty list means "no
+     * restriction, defer entirely to the product"), blocked dates, and
+     * holidays.
+     */
+    private static function is_date_available_for_location($location_id, $date, $day_of_week) {
+        $location = Bookflow_Locations::get($location_id);
+        if (!$location || $location->status !== 'active') {
+            return false;
+        }
+
+        $available_days = json_decode($location->available_days, true);
+        if (!empty($available_days) && is_array($available_days) && !in_array($day_of_week, $available_days, true)) {
+            return false;
+        }
+
+        $blocked = (array) json_decode($location->blocked_dates, true);
+        if (in_array($date, $blocked, true)) {
+            return false;
+        }
+
+        $holidays = (array) json_decode($location->holidays, true);
+        if (in_array($date, $holidays, true)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

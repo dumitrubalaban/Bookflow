@@ -410,5 +410,20 @@
     "admin.price": "Price",
     "cart.extras": "Extras",
     "cart.deposit_paid_now": "Deposit (paid now)",
-    "cart.balance_due": "Balance due on arrival"
+    "cart.balance_due": "Balance due on arrival",
+    "admin.locations": "Locations",
+    "admin.locations_desc": "Physical locations with their own working days, blocked dates, and holidays — assign a product to one on its Availability tab.",
+    "admin.location_saved": "Location saved.",
+    "admin.location_deleted": "Location deleted.",
+    "admin.add_location": "Add Location",
+    "admin.edit_location": "Edit Location",
+    "admin.save_location": "Save Location",
+    "admin.delete_location_confirm": "Delete this location?",
+    "admin.no_locations": "No locations found.",
+    "admin.holidays": "Holidays",
+    "admin.holidays_desc": "Dates when this location is closed (public holidays, etc). One per line, format: YYYY-MM-DD",
+    "product.location_title": "Location",
+    "product.location_desc": "Assign this product to a location to inherit its working days, blocked dates, and holidays in addition to the settings above.",
+    "product.location_label": "Location",
+    "product.location_none": "— None —"
 }

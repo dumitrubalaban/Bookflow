@@ -398,5 +398,20 @@
     "admin.price": "Цена",
     "cart.extras": "Дополнения",
     "cart.deposit_paid_now": "Депозит (оплачивается сейчас)",
-    "cart.balance_due": "Остаток при прибытии"
+    "cart.balance_due": "Остаток при прибытии",
+    "admin.locations": "Локации",
+    "admin.locations_desc": "Физические локации со своими рабочими днями, заблокированными датами и праздниками — назначьте товар локации на вкладке Доступность.",
+    "admin.location_saved": "Локация сохранена.",
+    "admin.location_deleted": "Локация удалена.",
+    "admin.add_location": "Добавить локацию",
+    "admin.edit_location": "Редактировать локацию",
+    "admin.save_location": "Сохранить локацию",
+    "admin.delete_location_confirm": "Удалить эту локацию?",
+    "admin.no_locations": "Локации не найдены.",
+    "admin.holidays": "Праздники",
+    "admin.holidays_desc": "Даты, когда эта локация закрыта (праздничные дни и т.д). По одной на строку, формат: YYYY-MM-DD",
+    "product.location_title": "Локация",
+    "product.location_desc": "Назначьте этот товар локации, чтобы унаследовать её рабочие дни, заблокированные даты и праздники в дополнение к настройкам выше.",
+    "product.location_label": "Локация",
+    "product.location_none": "— Нет —"
 }

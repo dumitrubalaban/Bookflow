@@ -398,5 +398,20 @@
     "admin.price": "Preț",
     "cart.extras": "Extra",
     "cart.deposit_paid_now": "Avans (plătit acum)",
-    "cart.balance_due": "Rest de plată la sosire"
+    "cart.balance_due": "Rest de plată la sosire",
+    "admin.locations": "Locații",
+    "admin.locations_desc": "Locații fizice cu propriile zile de lucru, date blocate și sărbători — atribuiți un produs unei locații în tab-ul Disponibilitate.",
+    "admin.location_saved": "Locație salvată.",
+    "admin.location_deleted": "Locație ștearsă.",
+    "admin.add_location": "Adaugă Locație",
+    "admin.edit_location": "Editează Locație",
+    "admin.save_location": "Salvează Locație",
+    "admin.delete_location_confirm": "Ștergeți această locație?",
+    "admin.no_locations": "Nicio locație găsită.",
+    "admin.holidays": "Sărbători",
+    "admin.holidays_desc": "Date când această locație este închisă (sărbători legale etc). Una pe linie, format: YYYY-MM-DD",
+    "product.location_title": "Locație",
+    "product.location_desc": "Atribuiți acest produs unei locații pentru a moșteni zilele de lucru, datele blocate și sărbătorile acesteia, în plus față de setările de mai sus.",
+    "product.location_label": "Locație",
+    "product.location_none": "— Niciuna —"
 }
