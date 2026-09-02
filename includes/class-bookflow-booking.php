@@ -391,6 +391,42 @@ class Bookflow_Booking {
     }
 
     /**
+     * Whether an existing booking's stored end_time falls inside the
+     * trailing-buffer window right before a candidate slot's start time —
+     * i.e. there isn't enough gap after the previous booking (same
+     * product/resource/date) for cleanup/travel time before this one.
+     */
+    public static function has_conflicting_trailing_booking($product_id, $date, $start_time, $buffer_minutes, $resource_id = null, $schedule_id = null) {
+        if ($buffer_minutes <= 0) {
+            return false;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'bookflow_bookings';
+
+        $window_start = gmdate('H:i:s', strtotime($start_time) - ($buffer_minutes * 60));
+
+        $sql = "SELECT COUNT(*) FROM $table
+                WHERE product_id = %d AND booking_date = %s
+                AND status NOT IN ('cancelled', 'refunded') AND deleted_at IS NULL
+                AND end_time IS NOT NULL
+                AND end_time > %s AND end_time <= %s";
+        $params = [absint($product_id), $date, $window_start, $start_time];
+
+        if ($resource_id) {
+            $sql .= " AND resource_id = %d";
+            $params[] = absint($resource_id);
+        }
+
+        if ($schedule_id) {
+            $sql .= " AND schedule_id = %d";
+            $params[] = absint($schedule_id);
+        }
+
+        return (int) $wpdb->get_var($wpdb->prepare($sql, ...$params)) > 0;
+    }
+
+    /**
      * Get all bookings with filters
      */
     public static function query($args = []) {

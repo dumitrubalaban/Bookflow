@@ -477,3 +477,257 @@ body.light-theme .bookflow-booking-form {
 @media (prefers-reduced-motion: reduce) {
     .bookflow-toast { transition: opacity 0.01s; }
 }
+
+/* ── Wizard step machine ── */
+.bookflow-wizard-step {
+    display: none;
+}
+.bookflow-wizard-step.bookflow-step-active {
+    display: block;
+    animation: bookflow-step-in 0.2s ease;
+}
+@keyframes bookflow-step-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Stepper */
+.bookflow-wizard-stepper {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 24px;
+}
+.bookflow-stepper-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px 6px 6px;
+    border-radius: 999px;
+    font-size: 12px;
+    color: var(--bookflow-text-muted);
+    background: var(--bookflow-bg);
+    border: 1px solid var(--bookflow-border);
+}
+.bookflow-stepper-num {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--bookflow-bg-alt);
+    color: var(--bookflow-text-muted);
+}
+.bookflow-stepper-item.is-active {
+    border-color: var(--bookflow-accent);
+    color: var(--bookflow-text);
+}
+.bookflow-stepper-item.is-active .bookflow-stepper-num {
+    background: var(--bookflow-accent);
+    color: #fff;
+}
+.bookflow-stepper-item.is-done {
+    color: var(--bookflow-accent);
+    cursor: pointer;
+}
+.bookflow-stepper-item.is-done .bookflow-stepper-num {
+    background: var(--bookflow-accent);
+    color: #fff;
+}
+.bookflow-stepper-item.is-pending .bookflow-stepper-label {
+    display: none;
+}
+
+/* Wizard nav (Back / Next) */
+.bookflow-wizard-nav {
+    display: flex;
+    justify-content: space-between;
+    max-width: 500px;
+    margin-top: 20px;
+}
+.bookflow-wizard-back,
+.bookflow-wizard-next {
+    padding: 12px 24px;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.bookflow-wizard-back {
+    background: none;
+    border: 1px solid var(--bookflow-border-alt);
+    color: var(--bookflow-text);
+}
+.bookflow-wizard-back:hover {
+    border-color: var(--bookflow-accent);
+    color: var(--bookflow-accent);
+}
+.bookflow-wizard-next {
+    background: var(--bookflow-accent);
+    border: 1px solid var(--bookflow-accent);
+    color: #fff;
+    margin-left: auto;
+}
+.bookflow-wizard-next:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Locations step */
+.bookflow-locations-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+    position: relative;
+}
+.bookflow-locations-grid.bookflow-loading-overlay {
+    opacity: 0.5;
+    pointer-events: none;
+}
+.bookflow-location {
+    background: var(--bookflow-bg);
+    border: 1px solid var(--bookflow-border);
+    padding: 15px;
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: var(--bookflow-text);
+    transition: all 0.2s;
+}
+.bookflow-location:hover {
+    border-color: var(--bookflow-accent);
+}
+.bookflow-location-selected {
+    background: var(--bookflow-accent) !important;
+    border-color: var(--bookflow-accent) !important;
+    color: #fff !important;
+}
+.bookflow-location-name {
+    font-size: 15px;
+    font-weight: 600;
+}
+.bookflow-location-address {
+    font-size: 12px;
+    color: var(--bookflow-text-subtle);
+}
+.bookflow-location-selected .bookflow-location-address {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Time slots as a list of full-width rows (room for capacity caption) */
+.bookflow-slots-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
+.bookflow-slot-option {
+    background: var(--bookflow-bg);
+    border: 1px solid var(--bookflow-border);
+    padding: 12px;
+    cursor: pointer;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: var(--bookflow-text);
+    transition: all 0.2s;
+}
+.bookflow-slot-option:hover {
+    border-color: var(--bookflow-accent);
+}
+.bookflow-slot-option .bookflow-slot-caption {
+    font-size: 11px;
+    color: var(--bookflow-text-muted);
+}
+.bookflow-slot-selected {
+    background: var(--bookflow-accent) !important;
+    border-color: var(--bookflow-accent) !important;
+    color: #fff !important;
+}
+.bookflow-slot-selected .bookflow-slot-caption {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Sold-out slots: visible but not selectable (Amelia-style) */
+.bookflow-slot-full {
+    opacity: 0.4;
+    cursor: not-allowed;
+    text-decoration: line-through;
+}
+.bookflow-slot-full .bookflow-slot-caption {
+    text-decoration: none;
+    color: #d9534f;
+}
+.bookflow-slot-full:hover {
+    border-color: var(--bookflow-border);
+}
+
+/* Extras / upsell */
+.bookflow-extras-block {
+    max-width: 400px;
+    margin-bottom: 20px;
+}
+.bookflow-extras-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.bookflow-extra-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bookflow-bg);
+    border: 1px solid var(--bookflow-border);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--bookflow-text);
+}
+.bookflow-extra-title {
+    flex: 1;
+}
+.bookflow-extra-price {
+    color: var(--bookflow-accent);
+    font-weight: 600;
+}
+
+/* Terms/waiver */
+.bookflow-terms-block {
+    max-width: 400px;
+    margin-top: 16px;
+}
+.bookflow-terms-text {
+    font-size: 12px;
+    color: var(--bookflow-text-subtle);
+    max-height: 120px;
+    overflow-y: auto;
+    padding: 10px 12px;
+    background: var(--bookflow-bg);
+    border: 1px solid var(--bookflow-border);
+    margin-bottom: 10px;
+}
+.bookflow-terms-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--bookflow-text);
+    cursor: pointer;
+}
+.bookflow-terms-row input {
+    margin-top: 2px;
+}
+
+.bookflow-spots-left {
+    display: block;
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--bookflow-accent);
+}

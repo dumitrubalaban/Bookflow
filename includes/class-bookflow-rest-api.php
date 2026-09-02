@@ -138,6 +138,15 @@ class Bookflow_REST_API {
             'permission_callback' => '__return_true',
         ]);
 
+        // Booking-widget bootstrap data for one product (public) — lets the
+        // wizard swap to a different location's product in place (AJAX) after
+        // the page has already loaded, instead of a full redirect.
+        register_rest_route(self::NAMESPACE, '/booking-data/(?P<product_id>\d+)', [
+            'methods'             => WP_REST_Server::READABLE,
+            'callback'            => [$this, 'get_booking_data'],
+            'permission_callback' => '__return_true',
+        ]);
+
         // Stats (admin)
         register_rest_route(self::NAMESPACE, '/stats', [
             'methods'             => WP_REST_Server::READABLE,
@@ -586,6 +595,63 @@ class Bookflow_REST_API {
         }
 
         return rest_ensure_response($result);
+    }
+
+    /**
+     * The same booking-widget bootstrap payload normally localized into
+     * `bookflowBooking` on page load, fetched here instead so the wizard can
+     * re-init its state for a different product (e.g. after a Location step
+     * swap) without a full page reload.
+     *
+     * GET /bookflow/v1/booking-data/{product_id}
+     */
+    public function get_booking_data($request) {
+        $product_id = absint($request['product_id']);
+        $product = wc_get_product($product_id);
+
+        if (!$product || $product->get_type() !== 'booking') {
+            return new WP_Error('not_found', 'Not a bookable product', ['status' => 404]);
+        }
+
+        $has_person_types = Bookflow_Person_Types::product_has_types($product_id);
+        $person_types = $has_person_types ? Bookflow_Person_Types::get_for_product($product_id) : [];
+        $has_schedules = Bookflow_Schedules::product_has_schedules($product_id);
+        $schedules = $has_schedules ? Bookflow_Schedules::get_for_product($product_id) : [];
+
+        $loc_terms = get_the_terms($product_id, 'product_tag');
+        $current_location = (!empty($loc_terms) && !is_wp_error($loc_terms)) ? current($loc_terms)->slug : null;
+
+        return rest_ensure_response([
+            'productId'       => $product_id,
+            'permalink'       => get_permalink($product_id),
+            'minPersons'      => $product->get_min_persons(),
+            'maxPersons'      => $product->get_max_persons(),
+            'hasPersonTypes'  => $has_person_types,
+            'personTypes'     => array_map(function ($pt) {
+                return [
+                    'id'      => (int) $pt->id,
+                    'name'    => $pt->name,
+                    'cost'    => (float) $pt->cost,
+                    'min_qty' => (int) $pt->min_qty,
+                    'max_qty' => (int) $pt->max_qty,
+                ];
+            }, $person_types),
+            'hasResources'    => $product->has_resources(),
+            'hasSchedules'    => $has_schedules,
+            'schedules'       => array_map(function ($s) {
+                return [
+                    'id'             => (int) $s->id,
+                    'option_group'   => $s->option_group,
+                    'option_label'   => $s->option_label,
+                    'option_value'   => $s->option_value,
+                    'available_days' => json_decode($s->available_days, true),
+                    'time_slots'     => json_decode($s->time_slots, true),
+                    'max_persons'    => (int) $s->max_persons,
+                    'price_modifier' => (float) $s->price_modifier,
+                ];
+            }, $schedules),
+            'currentLocation' => $current_location,
+        ]);
     }
 
     // --- Reservations ---

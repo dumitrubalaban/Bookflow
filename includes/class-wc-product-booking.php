@@ -11,6 +11,22 @@ if (!defined('ABSPATH')) {
 
 class WC_Product_Booking extends WC_Product {
 
+    /**
+     * Per-cart-item computed price (date/time/persons/resource/extras),
+     * set at runtime by Bookflow_Cart::set_booking_price(). get_price()
+     * always reads the product's base post-meta otherwise, so a plain
+     * WC_Product::set_price() call (the normal way plugins vary a cart
+     * item's price) has no effect on this product type — it must go
+     * through this instead.
+     *
+     * @var float|null
+     */
+    private $bookflow_dynamic_price = null;
+
+    public function set_bookflow_dynamic_price($price) {
+        $this->bookflow_dynamic_price = $price === null ? null : (float) $price;
+    }
+
     public function get_type() {
         return 'booking';
     }
@@ -28,6 +44,10 @@ class WC_Product_Booking extends WC_Product {
     }
 
     public function get_price($context = 'view') {
+        if ($this->bookflow_dynamic_price !== null) {
+            return $this->bookflow_dynamic_price;
+        }
+
         $price = get_post_meta($this->get_id(), '_bookflow_base_price', true);
         if ($price && (float) $price > 0) {
             return (float) $price;

@@ -210,6 +210,16 @@ class Bookflow_Product_Type {
             'value'     => get_post_meta($product_id, '_bookflow_base_price', true) ?: '',
         ]);
 
+        woocommerce_wp_text_input([
+            'id'          => '_bookflow_deposit_percent',
+            'label'       => Bookflow_I18n::t('product.deposit_percent'),
+            'type'        => 'number',
+            'custom_attributes' => ['min' => '0', 'max' => '100', 'step' => '1'],
+            'desc_tip'    => true,
+            'description' => Bookflow_I18n::t('product.deposit_percent_desc'),
+            'value'       => get_post_meta($product_id, '_bookflow_deposit_percent', true) ?: '0',
+        ]);
+
         echo '<div class="options_group">';
         echo '<h4 style="padding-left:12px;">' . esc_html(Bookflow_I18n::t('product.time_pricing_title')) . '</h4>';
         echo '<p style="padding-left:12px;" class="description">' . esc_html(Bookflow_I18n::t('product.time_pricing_desc')) . '</p>';
@@ -293,6 +303,21 @@ class Bookflow_Product_Type {
         ]);
 
         echo '</div>';
+
+        echo '<div class="options_group">';
+        echo '<h4 style="padding-left:12px;">' . esc_html(Bookflow_I18n::t('product.terms_title')) . '</h4>';
+        echo '<p style="padding-left:12px;" class="description">' . esc_html(Bookflow_I18n::t('product.terms_desc')) . '</p>';
+
+        woocommerce_wp_textarea_input([
+            'id'          => '_bookflow_terms_text',
+            'label'       => Bookflow_I18n::t('product.terms_label'),
+            'value'       => get_post_meta($product_id, '_bookflow_terms_text', true),
+            'style'       => 'height: 100px;',
+            'desc_tip'    => true,
+            'description' => Bookflow_I18n::t('product.terms_field_desc'),
+        ]);
+        echo '</div>';
+
         echo '</div>';
 
         // ---- Resources Panel ----
@@ -364,7 +389,7 @@ class Bookflow_Product_Type {
             '_bookflow_buffer_time', '_bookflow_max_bookings_per_slot', '_bookflow_min_advance',
             '_bookflow_max_advance', '_bookflow_cancel_before_hours', '_bookflow_time_slots',
             '_bookflow_base_price', '_bookflow_blocked_dates', '_bookflow_date_range_from',
-            '_bookflow_date_range_to',
+            '_bookflow_date_range_to', '_bookflow_terms_text', '_bookflow_deposit_percent',
         ];
 
         foreach ($fields as $field) {

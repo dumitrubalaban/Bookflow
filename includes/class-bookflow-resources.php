@@ -197,6 +197,32 @@ class Bookflow_Resources {
         return $available;
     }
 
+    /**
+     * Get resources with at least one open (structurally offered, non-full)
+     * slot on the given date — used by the "choose your guide" wizard step,
+     * which runs before a specific time is picked.
+     */
+    public static function get_available_for_date($product_id, $date, $schedule_id = null) {
+        $resources = self::get_for_product($product_id);
+        $available = [];
+
+        foreach ($resources as $resource) {
+            $slots = Bookflow_Availability::get_available_slots($product_id, $date, $resource->id, $schedule_id);
+            $has_open_slot = false;
+            foreach ($slots as $slot) {
+                if (empty($slot['is_full'])) {
+                    $has_open_slot = true;
+                    break;
+                }
+            }
+            if ($has_open_slot) {
+                $available[] = $resource;
+            }
+        }
+
+        return $available;
+    }
+
     // --- AJAX ---
 
     public function ajax_save() {

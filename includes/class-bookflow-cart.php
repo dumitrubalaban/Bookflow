@@ -43,6 +43,10 @@ class Bookflow_Cart {
         $hidden[] = '_bookflow_souvenir_for';
         $hidden[] = '_bookflow_schedule_id';
         $hidden[] = '_bookflow_tour_language';
+        $hidden[] = '_bookflow_location_tag';
+        $hidden[] = '_bookflow_terms_accepted';
+        $hidden[] = '_bookflow_terms_accepted_at';
+        $hidden[] = '_bookflow_extras';
         $hidden[] = 'Persoane';
         return $hidden;
     }
@@ -80,6 +84,11 @@ class Bookflow_Cart {
 
         if (!Bookflow_Availability::is_slot_available($product_id, $date, $time, $resource_id)) {
             wc_add_notice(Bookflow_I18n::t('error.slot_unavailable'), 'error');
+            return false;
+        }
+
+        if (get_post_meta($product_id, '_bookflow_terms_text', true) && empty($_POST['bookflow_terms_accepted'])) {
+            wc_add_notice(Bookflow_I18n::t('form.error_terms'), 'error');
             return false;
         }
 
@@ -139,6 +148,20 @@ class Bookflow_Cart {
         $cart_item_data['bookflow_customer_phone'] = sanitize_text_field(wp_unslash($_POST['bookflow_customer_phone'] ?? ''));
         $cart_item_data['bookflow_notes'] = sanitize_textarea_field(wp_unslash($_POST['bookflow_notes'] ?? ''));
 
+        // Location tag chosen in the wizard — informational only, not used by
+        // availability/pricing (Bookflow keeps "one location = one product").
+        $location_tag = sanitize_title(wp_unslash($_POST['bookflow_location_tag'] ?? ''));
+        if ($location_tag) {
+            $cart_item_data['bookflow_location_tag'] = $location_tag;
+        }
+
+        // Liability/terms waiver — only recorded when the product actually
+        // requires one (checkbox only renders then).
+        if (get_post_meta($product_id, '_bookflow_terms_text', true)) {
+            $cart_item_data['bookflow_terms_accepted'] = !empty($_POST['bookflow_terms_accepted']);
+            $cart_item_data['bookflow_terms_accepted_at'] = current_time('mysql');
+        }
+
         // Tour language (from schedule selection)
         $schedule_id = absint($_POST['bookflow_schedule_id'] ?? 0) ?: null;
         $cart_item_data['bookflow_schedule_id'] = $schedule_id;
@@ -148,6 +171,19 @@ class Bookflow_Cart {
             $cart_item_data['bookflow_tour_language'] = $lang_code;
             $cart_item_data['bookflow_tour_language_label'] = $lang_labels[$lang_code] ?? $lang_code;
         }
+
+        // Extras (cart-level upsells) — server re-prices from the DB, never
+        // trusts a client-submitted price.
+        $extra_ids = isset($_POST['bookflow_extras']) && is_array($_POST['bookflow_extras'])
+            ? array_map('absint', wp_unslash($_POST['bookflow_extras']))
+            : [];
+        $extras = $extra_ids ? Bookflow_Extras::get_many($extra_ids) : [];
+        if ($extras) {
+            $cart_item_data['bookflow_extras'] = array_map(function ($e) {
+                return ['id' => (int) $e->id, 'title' => $e->title, 'price' => (float) $e->price];
+            }, $extras);
+        }
+        $extra_ids_for_pricing = wp_list_pluck($extras, 'id');
 
         // Person types or simple count
         if (Bookflow_Person_Types::product_has_types($product_id) && !empty($_POST['bookflow_person_types'])) {
@@ -166,11 +202,11 @@ class Bookflow_Cart {
             }
             $cart_item_data['bookflow_person_types'] = $person_types;
             $cart_item_data['bookflow_persons_total'] = $total_persons;
-            $cart_item_data['bookflow_cost'] = Bookflow_Pricing::calculate_total($product_id, $date, $time, $person_types, $resource_id);
+            $cart_item_data['bookflow_cost'] = Bookflow_Pricing::calculate_total($product_id, $date, $time, $person_types, $resource_id, $extra_ids_for_pricing);
         } else {
             $persons = absint($_POST['bookflow_persons_total'] ?? 1);
             $cart_item_data['bookflow_persons_total'] = $persons;
-            $cart_item_data['bookflow_cost'] = Bookflow_Pricing::calculate_total($product_id, $date, $time, $persons, $resource_id);
+            $cart_item_data['bookflow_cost'] = Bookflow_Pricing::calculate_total($product_id, $date, $time, $persons, $resource_id, $extra_ids_for_pricing);
         }
 
         // Unique key to allow multiple bookings in cart
@@ -210,6 +246,12 @@ class Bookflow_Cart {
                 ];
             }
         }
+        if (!empty($cart_item['bookflow_extras'])) {
+            $item_data[] = [
+                'key'   => Bookflow_I18n::t('cart.extras'),
+                'value' => esc_html(implode(', ', wp_list_pluck($cart_item['bookflow_extras'], 'title'))),
+            ];
+        }
         if (!empty($cart_item['bookflow_customer_name'])) {
             $item_data[] = [
                 'key'   => Bookflow_I18n::t('cart.name'),
@@ -227,8 +269,12 @@ class Bookflow_Cart {
             return;
         }
         foreach ($cart->get_cart() as $cart_item) {
-            if (isset($cart_item['bookflow_cost'])) {
-                $cart_item['data']->set_price($cart_item['bookflow_cost']);
+            if (isset($cart_item['bookflow_cost']) && method_exists($cart_item['data'], 'set_bookflow_dynamic_price')) {
+                // WC_Product_Booking::get_price() always reads the product's
+                // base post-meta directly, so a plain WC_Product::set_price()
+                // has no effect on this product type — this is the actual
+                // per-cart-item override point.
+                $cart_item['data']->set_bookflow_dynamic_price($cart_item['bookflow_cost']);
             }
         }
     }
@@ -261,6 +307,15 @@ class Bookflow_Cart {
         $item->add_meta_data('_bookflow_start_time', $values['bookflow_start_time']);
         $item->add_meta_data('_bookflow_persons_total', $values['bookflow_persons_total']);
         $item->add_meta_data('_bookflow_resource_id', $values['bookflow_resource_id'] ?? '');
+        $item->add_meta_data('_bookflow_location_tag', $values['bookflow_location_tag'] ?? '');
+        if (isset($values['bookflow_terms_accepted'])) {
+            $item->add_meta_data('_bookflow_terms_accepted', $values['bookflow_terms_accepted'] ? 'yes' : 'no');
+            $item->add_meta_data('_bookflow_terms_accepted_at', $values['bookflow_terms_accepted_at'] ?? '');
+        }
+        if (!empty($values['bookflow_extras'])) {
+            $item->add_meta_data(Bookflow_I18n::t('cart.extras'), implode(', ', wp_list_pluck($values['bookflow_extras'], 'title')));
+            $item->add_meta_data('_bookflow_extras', wp_json_encode($values['bookflow_extras']));
+        }
         $item->add_meta_data('_bookflow_customer_name', $values['bookflow_customer_name'] ?? '');
         $item->add_meta_data('_bookflow_customer_email', $values['bookflow_customer_email'] ?? '');
         $item->add_meta_data('_bookflow_customer_phone', $values['bookflow_customer_phone'] ?? '');

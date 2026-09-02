@@ -139,19 +139,50 @@ class Bookflow_Availability {
      * @param int|null $schedule_id
      */
     public static function is_slot_available($product_id, $date, $start_time, $resource_id = null, $schedule_id = null) {
-        if (!self::is_date_available($product_id, $date, $schedule_id)) {
+        $status = self::get_slot_status($product_id, $date, $start_time, $resource_id, $schedule_id);
+        if (!$status['structurally_offered']) {
             return false;
         }
 
+        if ($status['current_count'] >= $status['max_per_slot']) {
+            return false;
+        }
+        if ($status['booked_persons'] >= $status['max_persons']) {
+            return false;
+        }
+
+        return apply_filters('bookflow_is_slot_available', true, $product_id, $date, $start_time, $resource_id, $schedule_id);
+    }
+
+    /**
+     * Compute whether a slot is structurally offered (in schedule, passes time
+     * rules, resource available, not past) separately from its capacity numbers,
+     * so callers can distinguish "not offered at all" from "offered but full".
+     *
+     * @return array{structurally_offered:bool,max_per_slot:int,max_persons:int,current_count:int,booked_persons:int}
+     */
+    private static function get_slot_status($product_id, $date, $start_time, $resource_id = null, $schedule_id = null) {
+        $result = [
+            'structurally_offered' => false,
+            'max_per_slot'         => 0,
+            'max_persons'          => 0,
+            'current_count'        => 0,
+            'booked_persons'       => 0,
+        ];
+
+        if (!self::is_date_available($product_id, $date, $schedule_id)) {
+            return $result;
+        }
+
         $product = wc_get_product($product_id);
+        $schedule = $schedule_id ? Bookflow_Schedules::get($schedule_id) : null;
 
         // If schedule_id given, verify this time slot belongs to the schedule
         if ($schedule_id) {
-            $schedule = Bookflow_Schedules::get($schedule_id);
             if ($schedule) {
                 $schedule_slots = json_decode($schedule->time_slots, true);
                 if (!empty($schedule_slots) && !in_array($start_time, $schedule_slots)) {
-                    return false;
+                    return $result;
                 }
             }
         } else {
@@ -159,64 +190,61 @@ class Bookflow_Availability {
             $raw = get_post_meta($product_id, '_bookflow_time_slots', true);
             $product_slots = array_filter(array_map('trim', preg_split('/[\r\n]+/', (string) $raw)));
             if (!empty($product_slots) && !in_array($start_time, $product_slots, true)) {
-                return false;
+                return $result;
             }
         }
 
         // Check time-based availability rules
         if (!self::check_time_availability_rules($product_id, $date, $start_time, $resource_id)) {
-            return false;
+            return $result;
+        }
+
+        // Check resource availability
+        if ($resource_id) {
+            if (!Bookflow_Resources::is_resource_available($resource_id, $product_id, $date, $start_time)) {
+                return $result;
+            }
+        }
+
+        $buffer = (int) (get_post_meta($product_id, '_bookflow_buffer_time', true) ?: 0);
+
+        // Check if today and slot is in the past (leading buffer)
+        $today = wp_date('Y-m-d');
+        if ($date === $today) {
+            // Compute "now + buffer" entirely in the site timezone to avoid UTC drift
+            $buffered_time = current_datetime()->modify("+{$buffer} minutes")->format('H:i');
+            if ($start_time <= $buffered_time) {
+                return $result;
+            }
+        }
+
+        // Trailing buffer: block a slot that starts too soon after another
+        // booking (same product/resource/date) ends, so guides get cleanup
+        // or travel time between bookings.
+        if (Bookflow_Booking::has_conflicting_trailing_booking($product_id, $date, $start_time, $buffer, $resource_id, $schedule_id)) {
+            return $result;
         }
 
         // Determine capacity limits — schedule can override product defaults
         $max_per_slot = $product->get_max_bookings_per_slot();
         $max_persons = $product->get_max_persons();
 
-        if ($schedule_id) {
-            $schedule = $schedule ?? Bookflow_Schedules::get($schedule_id);
-            if ($schedule) {
-                if ($schedule->max_bookings_per_slot > 0) {
-                    $max_per_slot = (int) $schedule->max_bookings_per_slot;
-                }
-                if ($schedule->max_persons > 0) {
-                    $max_persons = (int) $schedule->max_persons;
-                }
+        if ($schedule) {
+            if ($schedule->max_bookings_per_slot > 0) {
+                $max_per_slot = (int) $schedule->max_bookings_per_slot;
+            }
+            if ($schedule->max_persons > 0) {
+                $max_persons = (int) $schedule->max_persons;
             }
         }
 
-        // Check booking count for slot (scoped to schedule if provided)
-        $current_count = Bookflow_Booking::count_for_slot($product_id, $date, $start_time, $resource_id, $schedule_id);
+        $result['structurally_offered'] = true;
+        $result['max_per_slot'] = $max_per_slot;
+        $result['max_persons'] = $max_persons;
+        $result['current_count'] = Bookflow_Booking::count_for_slot($product_id, $date, $start_time, $resource_id, $schedule_id);
+        $result['booked_persons'] = Bookflow_Booking::persons_for_slot($product_id, $date, $start_time, $resource_id, $schedule_id);
 
-        if ($current_count >= $max_per_slot) {
-            return false;
-        }
-
-        // Check person capacity for slot (scoped to schedule if provided)
-        $booked_persons = Bookflow_Booking::persons_for_slot($product_id, $date, $start_time, $resource_id, $schedule_id);
-
-        if ($booked_persons >= $max_persons) {
-            return false;
-        }
-
-        // Check resource availability
-        if ($resource_id) {
-            if (!Bookflow_Resources::is_resource_available($resource_id, $product_id, $date, $start_time)) {
-                return false;
-            }
-        }
-
-        // Check if today and slot is in the past
-        $today = wp_date('Y-m-d');
-        if ($date === $today) {
-            $buffer = (int) (get_post_meta($product_id, '_bookflow_buffer_time', true) ?: 0);
-            // Compute "now + buffer" entirely in the site timezone to avoid UTC drift
-            $buffered_time = current_datetime()->modify("+{$buffer} minutes")->format('H:i');
-            if ($start_time <= $buffered_time) {
-                return false;
-            }
-        }
-
-        return apply_filters('bookflow_is_slot_available', true, $product_id, $date, $start_time, $resource_id, $schedule_id);
+        return $result;
     }
 
     /**
@@ -317,14 +345,16 @@ class Bookflow_Availability {
         $available = [];
 
         foreach ($all_slots as $slot) {
-            if (!self::is_slot_available($product_id, $date, $slot, $resource_id, $schedule_id)) {
+            $status = self::get_slot_status($product_id, $date, $slot, $resource_id, $schedule_id);
+            if (!$status['structurally_offered']) {
                 continue;
             }
 
-            $booked_persons = Bookflow_Booking::persons_for_slot($product_id, $date, $slot, $resource_id, $schedule_id);
-            $remaining_persons = max(0, $max_persons - $booked_persons);
-            $booking_count = Bookflow_Booking::count_for_slot($product_id, $date, $slot, $resource_id, $schedule_id);
-            $remaining_bookings = max(0, $max_per_slot - $booking_count);
+            $booked_persons = $status['booked_persons'];
+            $remaining_persons = max(0, $status['max_persons'] - $booked_persons);
+            $booking_count = $status['current_count'];
+            $remaining_bookings = max(0, $status['max_per_slot'] - $booking_count);
+            $is_full = ($booking_count >= $status['max_per_slot']) || ($booked_persons >= $status['max_persons']);
 
             $base_price = Bookflow_Pricing::get_price_for_slot($product_id, $date, $slot);
 
@@ -333,8 +363,9 @@ class Bookflow_Availability {
                 'available'          => $remaining_persons,
                 'available_bookings' => $remaining_bookings,
                 'booked_persons'     => $booked_persons,
-                'max_persons'        => $max_persons,
+                'max_persons'        => $status['max_persons'],
                 'price'              => $base_price + $price_modifier,
+                'is_full'            => $is_full,
             ];
 
             // Include available resources if product has resources
@@ -389,7 +420,7 @@ class Bookflow_Availability {
             $slots_count = 0;
             if ($available) {
                 $slots = self::compute_available_slots($product_id, $date, null, $schedule_id);
-                $slots_count = count($slots);
+                $slots_count = count(array_filter($slots, function ($s) { return empty($s['is_full']); }));
                 $available = $slots_count > 0;
             }
 

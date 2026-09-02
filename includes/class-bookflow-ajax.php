@@ -17,6 +17,7 @@ class Bookflow_Ajax {
             'bookflow_get_month_availability',
             'bookflow_calculate_price',
             'bookflow_get_resources_for_slot',
+            'bookflow_get_resources_for_date',
             'bookflow_get_options_for_date',
         ];
 
@@ -84,6 +85,7 @@ class Bookflow_Ajax {
         $date        = sanitize_text_field(wp_unslash($_POST['date'] ?? ''));
         $start_time  = sanitize_text_field(wp_unslash($_POST['start_time'] ?? ''));
         $resource_id = absint($_POST['resource_id'] ?? 0) ?: null;
+        $extra_ids   = isset($_POST['extras']) && is_array($_POST['extras']) ? array_map('absint', wp_unslash($_POST['extras'])) : null;
 
         if (!$product_id || !$date || !$start_time) {
             wp_send_json_error(['message' => Bookflow_I18n::t('error.invalid_request')]);
@@ -106,11 +108,11 @@ class Bookflow_Ajax {
                     $total_persons += $qty;
                 }
             }
-            $total = Bookflow_Pricing::calculate_total($product_id, $date, $start_time, $persons_data, $resource_id);
+            $total = Bookflow_Pricing::calculate_total($product_id, $date, $start_time, $persons_data, $resource_id, $extra_ids);
         } else {
             $persons = absint($_POST['persons'] ?? 1);
             $total_persons = $persons;
-            $total = Bookflow_Pricing::calculate_total($product_id, $date, $start_time, $persons, $resource_id);
+            $total = Bookflow_Pricing::calculate_total($product_id, $date, $start_time, $persons, $resource_id, $extra_ids);
         }
 
         $price_per_person = Bookflow_Pricing::get_price_for_slot($product_id, $date, $start_time);
@@ -198,6 +200,42 @@ class Bookflow_Ajax {
         }
 
         $resources = Bookflow_Resources::get_available_for_slot($product_id, $date, $start_time);
+
+        $result = array_map(function ($r) {
+            return [
+                'id'          => (int) $r->id,
+                'title'       => $r->title,
+                'description' => $r->description,
+                'photoUrl'    => Bookflow_Resources::get_photo_url($r),
+                'capacity'    => (int) $r->capacity,
+                'cost'        => (float) $r->base_cost,
+            ];
+        }, $resources);
+
+        wp_send_json_success(['resources' => $result]);
+    }
+
+    /**
+     * Get resources (guides/staff) with an open slot on a given date, before
+     * a specific time is chosen — used by the wizard's "choose your guide"
+     * step, which now runs before the Time/Slots step.
+     */
+    public function get_resources_for_date() {
+        check_ajax_referer('bookflow_nonce', 'nonce');
+
+        if (!Bookflow_Rate_Limit::check('resources', 30, 60)) {
+            wp_send_json_error(['message' => Bookflow_I18n::t('error.rate_limited')], 429);
+        }
+
+        $product_id  = absint($_POST['product_id'] ?? 0);
+        $date        = sanitize_text_field(wp_unslash($_POST['date'] ?? ''));
+        $schedule_id = absint($_POST['schedule_id'] ?? 0) ?: null;
+
+        if (!$product_id || !$date) {
+            wp_send_json_error(['message' => Bookflow_I18n::t('error.invalid_request')]);
+        }
+
+        $resources = Bookflow_Resources::get_available_for_date($product_id, $date, $schedule_id);
 
         $result = array_map(function ($r) {
             return [

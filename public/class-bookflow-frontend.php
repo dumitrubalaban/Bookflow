@@ -14,8 +14,42 @@ class Bookflow_Frontend {
     public function __construct() {
         add_action('wp_enqueue_scripts', [$this, 'enqueue_scripts']);
         add_action('woocommerce_before_add_to_cart_button', [$this, 'booking_form'], 20);
+        // WooCommerce only auto-renders the add-to-cart area for its own
+        // built-in product types (simple/variable/grouped/external); a
+        // custom type like "booking" needs to hook its own
+        // woocommerce_{type}_add_to_cart action or the whole add-to-cart
+        // template — including woocommerce_before_add_to_cart_button above —
+        // never fires.
+        add_action('woocommerce_booking_add_to_cart', [$this, 'add_to_cart_template']);
         add_filter('woocommerce_loop_add_to_cart_link', [$this, 'loop_add_to_cart'], 10, 2);
         add_filter('woocommerce_get_price_html', [$this, 'price_html'], 10, 2);
+    }
+
+    /**
+     * Minimal mirror of WooCommerce's own single-product/add-to-cart/simple.php,
+     * so the standard before/after hooks (and Bookflow's booking form, which
+     * hangs off woocommerce_before_add_to_cart_button) fire for this product type.
+     */
+    public function add_to_cart_template() {
+        global $product;
+        if (!$product->is_purchasable()) {
+            return;
+        }
+
+        echo wc_get_stock_html($product);
+
+        do_action('woocommerce_before_add_to_cart_form');
+        ?>
+        <form class="cart" action="<?php echo esc_url(apply_filters('woocommerce_add_to_cart_form_action', $product->get_permalink())); ?>" method="post" enctype="multipart/form-data">
+            <?php do_action('woocommerce_before_add_to_cart_button'); ?>
+            <input type="hidden" name="add-to-cart" value="<?php echo esc_attr($product->get_id()); ?>">
+            <button type="submit" id="bookflow-submit" name="add-to-cart" value="<?php echo esc_attr($product->get_id()); ?>" class="single_add_to_cart_button button alt" disabled>
+                <?php echo esc_html($product->single_add_to_cart_text()); ?>
+            </button>
+            <?php do_action('woocommerce_after_add_to_cart_button'); ?>
+        </form>
+        <?php
+        do_action('woocommerce_after_add_to_cart_form');
     }
 
     public function enqueue_scripts() {
@@ -54,6 +88,9 @@ class Bookflow_Frontend {
             ];
         }, $person_types);
 
+        $loc_terms = get_the_terms($post->ID, 'product_tag');
+        $current_location = (!empty($loc_terms) && !is_wp_error($loc_terms)) ? current($loc_terms)->slug : null;
+
         $schedules_data = array_map(function ($s) {
             return [
                 'id'             => (int) $s->id,
@@ -70,6 +107,9 @@ class Bookflow_Frontend {
         wp_localize_script('bookflow-booking', 'bookflowBooking', [
             'ajaxUrl'         => admin_url('admin-ajax.php'),
             'nonce'           => wp_create_nonce('bookflow_nonce'),
+            'restUrl'         => esc_url_raw(rest_url('bookflow/v1/')),
+            'restNonce'       => wp_create_nonce('wp_rest'),
+            'currentLocation' => $current_location,
             'productId'       => $post->ID,
             'minPersons'      => $product->get_min_persons(),
             'maxPersons'      => $product->get_max_persons(),
@@ -90,6 +130,22 @@ class Bookflow_Frontend {
                 'selectSchedule'  => Bookflow_I18n::t('calendar.select_option'),
                 'selectResource'  => Bookflow_I18n::t('calendar.select_resource'),
                 'spotsRemaining'  => Bookflow_I18n::t('calendar.spots_remaining'),
+                'soldOut'         => Bookflow_I18n::t('calendar.sold_out'),
+                'spotsOfMax'      => Bookflow_I18n::t('calendar.spots_of_max'),
+                'selectLocation'  => Bookflow_I18n::t('form.select_location'),
+                'selectStaff'     => Bookflow_I18n::t('form.select_resource'),
+                'changeLocation'  => Bookflow_I18n::t('form.change_location'),
+                'stepLanguage'    => Bookflow_I18n::t('wizard.step_language'),
+                'stepLocation'    => Bookflow_I18n::t('wizard.step_location'),
+                'stepDay'         => Bookflow_I18n::t('wizard.step_day'),
+                'stepStaff'       => Bookflow_I18n::t('wizard.step_staff'),
+                'stepTime'        => Bookflow_I18n::t('wizard.step_time'),
+                'stepPersons'     => Bookflow_I18n::t('wizard.step_persons'),
+                'stepContact'     => Bookflow_I18n::t('wizard.step_contact'),
+                'stepConfirm'     => Bookflow_I18n::t('wizard.step_confirm'),
+                'wizardBack'      => Bookflow_I18n::t('wizard.back'),
+                'wizardNext'      => Bookflow_I18n::t('wizard.next'),
+                'noSlotsForStaff' => Bookflow_I18n::t('wizard.no_slots_for_staff'),
                 'mon'             => Bookflow_I18n::t('calendar.weekday.mon'),
                 'tue'             => Bookflow_I18n::t('calendar.weekday.tue'),
                 'wed'             => Bookflow_I18n::t('calendar.weekday.wed'),

@@ -137,7 +137,7 @@ class Bookflow_Pricing {
     /**
      * Calculate total cost for a booking
      */
-    public static function calculate_total($product_id, $date, $start_time, $persons_data, $resource_id = null) {
+    public static function calculate_total($product_id, $date, $start_time, $persons_data, $resource_id = null, $extra_ids = null) {
         $total = 0;
 
         // Check if using person types
@@ -167,6 +167,13 @@ class Bookflow_Pricing {
             ));
             if ($resource_cost) {
                 $total += (float) $resource_cost;
+            }
+        }
+
+        // Add selected extras (flat, once per booking — not per person)
+        if (!empty($extra_ids)) {
+            foreach (Bookflow_Extras::get_many($extra_ids) as $extra) {
+                $total += (float) $extra->price;
             }
         }
 
