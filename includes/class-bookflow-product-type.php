@@ -448,7 +448,7 @@ class Bookflow_Product_Type {
         if (!empty($_POST['bookflow_assign_resource'])) {
             $resource_id = absint($_POST['bookflow_assign_resource']);
             if ($resource_id) {
-                Bookflow_Resources::assign_to_product($resource_id, $product_id);
+                Bookflow_Resources::assign_to_product($product_id, $resource_id);
             }
         }
 

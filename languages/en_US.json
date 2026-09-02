@@ -430,5 +430,14 @@
     "product.is_gift_voucher_desc": "When an order for this product is completed, a unique discount code is generated per unit and emailed to the buyer.",
     "email.subject.gift_voucher": "Your gift voucher from %s",
     "email.body.gift_voucher": "Thank you for your purchase! Here is your gift voucher code — share it with whoever will use it, or redeem it yourself on your next booking.",
-    "email.label.gift_voucher_note": "Enter this code in the \"Have a coupon?\" field at checkout. Valid for 12 months."
+    "email.label.gift_voucher_note": "Enter this code in the \"Have a coupon?\" field at checkout. Valid for 12 months.",
+    "email.subject.rate_guide": "How was your tour? — %s",
+    "email.body.rate_guide": "We hope you enjoyed your tour with %s! Please take a moment to rate your experience.",
+    "email.label.rate_guide_button": "Rate your guide",
+    "form.rate_your_guide": "Rate your guide",
+    "form.rating_comment_placeholder": "Leave a comment (optional)",
+    "form.submit_rating": "Submit rating",
+    "form.rating_thanks": "Thank you for your feedback!",
+    "form.rating_already_submitted": "You've already rated this booking. Thank you!",
+    "form.rating_link_invalid": "This rating link is invalid or has expired."
 }

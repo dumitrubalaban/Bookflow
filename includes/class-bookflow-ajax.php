@@ -219,6 +219,8 @@ class Bookflow_Ajax {
                 'photoUrl'    => Bookflow_Resources::get_photo_url($r),
                 'capacity'    => (int) $r->capacity,
                 'cost'        => (float) $r->base_cost,
+                'avgRating'   => (float) $r->avg_rating,
+                'ratingCount' => (int) $r->rating_count,
             ];
         }, $resources);
 
@@ -255,6 +257,8 @@ class Bookflow_Ajax {
                 'photoUrl'    => Bookflow_Resources::get_photo_url($r),
                 'capacity'    => (int) $r->capacity,
                 'cost'        => (float) $r->base_cost,
+                'avgRating'   => (float) $r->avg_rating,
+                'ratingCount' => (int) $r->rating_count,
             ];
         }, $resources);
 

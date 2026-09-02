@@ -229,7 +229,7 @@ class Bookflow_Booking {
             'resource_id', 'schedule_id', 'order_id', 'customer_id', 'booking_date', 'start_time',
             'end_time', 'all_day', 'persons_total', 'cost', 'customer_name',
             'customer_email', 'customer_phone', 'customer_locale', 'notes',
-            'internal_notes', 'cancellation_reason', 'google_calendar_event_id',
+            'internal_notes', 'cancellation_reason', 'google_calendar_event_id', 'rating_token',
         ];
 
         $update = [];

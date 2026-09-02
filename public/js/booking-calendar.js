@@ -974,6 +974,9 @@
                 html += '<img class="bookflow-resource-photo" src="' + escapeAttr(r.photoUrl) + '" alt="" loading="lazy">';
             }
             html += '<span class="bookflow-resource-name">' + escapeHtml(r.title) + '</span>';
+            if (r.ratingCount > 0) {
+                html += '<span class="bookflow-resource-rating">&#9733; ' + r.avgRating.toFixed(1) + ' &middot; ' + r.ratingCount + '</span>';
+            }
             if (r.description) {
                 html += '<span class="bookflow-resource-description">' + escapeHtml(r.description) + '</span>';
             }

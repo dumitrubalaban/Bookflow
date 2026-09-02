@@ -238,6 +238,15 @@
     color: rgba(255, 255, 255, 0.8);
 }
 
+.bookflow-resource-rating {
+    font-size: 12px;
+    color: #f0ad4e;
+    font-weight: 600;
+}
+.bookflow-resource-selected .bookflow-resource-rating {
+    color: #fff;
+}
+
 .bookflow-resource-photo {
     width: 64px;
     height: 64px;

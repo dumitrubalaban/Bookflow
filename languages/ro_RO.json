@@ -418,5 +418,14 @@
     "product.is_gift_voucher_desc": "Când o comandă pentru acest produs este finalizată, se generează un cod de reducere unic per unitate și se trimite prin email cumpărătorului.",
     "email.subject.gift_voucher": "Voucherul dvs. cadou de la %s",
     "email.body.gift_voucher": "Vă mulțumim pentru achiziție! Iată codul voucherului cadou — distribuiți-l cui îl va folosi sau valorificați-l dvs. la următoarea rezervare.",
-    "email.label.gift_voucher_note": "Introduceți acest cod în câmpul „Aveți un cupon?” la finalizarea comenzii. Valabil 12 luni."
+    "email.label.gift_voucher_note": "Introduceți acest cod în câmpul „Aveți un cupon?” la finalizarea comenzii. Valabil 12 luni.",
+    "email.subject.rate_guide": "Cum a fost turul? — %s",
+    "email.body.rate_guide": "Sperăm că v-a plăcut turul cu %s! Vă rugăm să acordați un moment pentru a evalua experiența.",
+    "email.label.rate_guide_button": "Evaluați ghidul",
+    "form.rate_your_guide": "Evaluați ghidul",
+    "form.rating_comment_placeholder": "Lăsați un comentariu (opțional)",
+    "form.submit_rating": "Trimite evaluarea",
+    "form.rating_thanks": "Vă mulțumim pentru feedback!",
+    "form.rating_already_submitted": "Ați evaluat deja această rezervare. Mulțumim!",
+    "form.rating_link_invalid": "Acest link de evaluare este invalid sau a expirat."
 }
