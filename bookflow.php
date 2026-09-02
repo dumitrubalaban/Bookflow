@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 define('BOOKFLOW_VERSION', '1.0.0');
-define('BOOKFLOW_DB_VERSION', '1.7.0');
+define('BOOKFLOW_DB_VERSION', '1.8.0');
 define('BOOKFLOW_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('BOOKFLOW_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('BOOKFLOW_PLUGIN_FILE', __FILE__);
@@ -87,6 +87,7 @@ function bookflow_init() {
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-extras.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-vouchers.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-ratings.php';
+    require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-abandoned.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-locations.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-schedules.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-person-types.php';
@@ -126,6 +127,7 @@ function bookflow_init() {
     new Bookflow_Extras();
     new Bookflow_Vouchers();
     new Bookflow_Ratings();
+    new Bookflow_Abandoned();
     new Bookflow_Locations();
     new Bookflow_Schedules();
     new Bookflow_Person_Types();
@@ -393,6 +395,26 @@ function bookflow_create_tables() {
         KEY status (status)
     ) $charset_collate;");
 
+    // Abandoned bookings (partial contact info captured before checkout,
+    // for a "still interested?" follow-up email)
+    dbDelta("CREATE TABLE {$wpdb->prefix}bookflow_abandoned_bookings (
+        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+        product_id bigint(20) unsigned NOT NULL,
+        email varchar(255) DEFAULT NULL,
+        phone varchar(50) DEFAULT NULL,
+        name varchar(255) DEFAULT NULL,
+        step_reached varchar(30) DEFAULT NULL,
+        created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        followup_sent_at datetime DEFAULT NULL,
+        recovered tinyint(1) NOT NULL DEFAULT 0,
+        PRIMARY KEY (id),
+        KEY product_id (product_id),
+        KEY email (email),
+        KEY phone (phone),
+        KEY recovered (recovered)
+    ) $charset_collate;");
+
     // Audit log
     dbDelta("CREATE TABLE {$wpdb->prefix}bookflow_log (
         id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -420,6 +442,14 @@ function bookflow_maybe_migrate() {
     $current_version = get_option('bookflow_db_version', '0');
     if (version_compare($current_version, BOOKFLOW_DB_VERSION, '<')) {
         bookflow_create_tables();
+        // Re-run (idempotent: schedule_events() only touches jobs that
+        // aren't already scheduled) so new cron jobs added in a later
+        // version reach sites that installed before them, without
+        // requiring a deactivate/reactivate. This runs before the main
+        // includes block, so load the class explicitly.
+        require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-abandoned.php';
+        require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-cron.php';
+        Bookflow_Cron::schedule_events();
     }
 }
 

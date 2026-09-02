@@ -608,6 +608,7 @@
                 if (wrapper) wrapper.classList.add('was-touched');
                 validateField(this);
                 updateWizardNav();
+                maybeSavePartial();
             });
             input.addEventListener('input', function () {
                 if (wrapper && wrapper.classList.contains('was-touched')) {
@@ -1118,6 +1119,30 @@
         updateWizardNav();
         checkFormReady();
         nextStep();
+    }
+
+    // Capture partial contact info on blur (name/phone/email) so an
+    // abandoned booking can get a "still interested?" follow-up later.
+    // Debounced + only fires once there's an email or phone worth having.
+    var savePartialTimer = null;
+    function maybeSavePartial() {
+        clearTimeout(savePartialTimer);
+        savePartialTimer = setTimeout(function () {
+            var nameEl = document.getElementById('bookflow-customer-name');
+            var phoneEl = document.getElementById('bookflow-customer-phone');
+            var emailEl = document.getElementById('bookflow-customer-email');
+            var phone = phoneEl ? phoneEl.value.trim() : '';
+            var email = emailEl ? emailEl.value.trim() : '';
+            if (phone.length < 6 && !email) return;
+
+            ajax('bookflow_save_partial', {
+                product_id: bookflowBooking.productId,
+                name: nameEl ? nameEl.value.trim() : '',
+                phone: phone,
+                email: email,
+                step: state.currentStep,
+            }, function () {}, function () {});
+        }, 800);
     }
 
     function updatePrice() {

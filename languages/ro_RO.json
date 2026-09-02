@@ -427,5 +427,8 @@
     "form.submit_rating": "Trimite evaluarea",
     "form.rating_thanks": "Vă mulțumim pentru feedback!",
     "form.rating_already_submitted": "Ați evaluat deja această rezervare. Mulțumim!",
-    "form.rating_link_invalid": "Acest link de evaluare este invalid sau a expirat."
+    "form.rating_link_invalid": "Acest link de evaluare este invalid sau a expirat.",
+    "email.subject.abandoned_followup": "Mai sunteți interesat de %s?",
+    "email.body.abandoned_followup": "Bună %1$s, am observat că ați început rezervarea pentru %2$s dar nu ați finalizat. Locul este încă disponibil — continuați de unde ați rămas.",
+    "email.label.finish_booking": "Finalizează rezervarea"
 }

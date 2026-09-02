@@ -16,6 +16,7 @@ class Bookflow_Cron {
         add_action('bookflow_cron_auto_complete', [__CLASS__, 'auto_complete_bookings']);
         add_action('bookflow_cron_cleanup_pending', [__CLASS__, 'cleanup_stale_pending']);
         add_action('bookflow_cron_mark_no_show', [__CLASS__, 'mark_no_shows']);
+        add_action('bookflow_cron_abandoned_followup', [Bookflow_Abandoned::class, 'send_followups']);
     }
 
     /**
@@ -34,6 +35,9 @@ class Bookflow_Cron {
         if (!wp_next_scheduled('bookflow_cron_mark_no_show')) {
             wp_schedule_event(time(), 'daily', 'bookflow_cron_mark_no_show');
         }
+        if (!wp_next_scheduled('bookflow_cron_abandoned_followup')) {
+            wp_schedule_event(time(), 'hourly', 'bookflow_cron_abandoned_followup');
+        }
     }
 
     /**
@@ -44,6 +48,7 @@ class Bookflow_Cron {
         wp_clear_scheduled_hook('bookflow_cron_auto_complete');
         wp_clear_scheduled_hook('bookflow_cron_cleanup_pending');
         wp_clear_scheduled_hook('bookflow_cron_mark_no_show');
+        wp_clear_scheduled_hook('bookflow_cron_abandoned_followup');
     }
 
     /**
