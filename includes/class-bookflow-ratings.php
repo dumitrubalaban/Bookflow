@@ -82,6 +82,7 @@ class Bookflow_Ratings {
      * the existing booking self-cancel link elsewhere in this plugin.
      */
     public function maybe_render_rating_page() {
+        // phpcs:disable WordPress.Security.NonceVerification.Recommended
         if (!isset($_GET['bookflow_rate'])) {
             return;
         }
@@ -89,6 +90,7 @@ class Bookflow_Ratings {
         $booking_id = absint($_GET['bookflow_rate']);
         $token = sanitize_text_field(wp_unslash($_GET['token'] ?? ''));
         $booking = Bookflow_Booking::get($booking_id);
+        // phpcs:enable
 
         $valid = $booking && $token && hash_equals((string) $booking->rating_token, $token);
         $already_rated = $valid ? $this->get_existing_rating($booking_id) : null;
@@ -184,10 +186,12 @@ class Bookflow_Ratings {
     // pattern as maybe_render_rating_page() above; the per-booking
     // rating_token IS the CSRF/auth check (hash_equals() below).
     public function ajax_submit() {
+        // phpcs:disable WordPress.Security.NonceVerification.Missing
         $booking_id = absint($_POST['booking_id'] ?? 0);
         $token = sanitize_text_field(wp_unslash($_POST['token'] ?? ''));
         $rating = absint($_POST['rating'] ?? 0);
         $comment = sanitize_textarea_field(wp_unslash($_POST['comment'] ?? ''));
+        // phpcs:enable
 
         $booking = Bookflow_Booking::get($booking_id);
         if (!$booking || !$token || !hash_equals((string) $booking->rating_token, $token)) {

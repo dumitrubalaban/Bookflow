@@ -183,6 +183,7 @@ class Bookflow_Locations {
      * point — no nonce check needed here too.
      */
     private static function collect_post_data() {
+        // phpcs:disable WordPress.Security.NonceVerification.Missing
         $days = [];
         foreach (['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as $day) {
             if (!empty($_POST['day_' . $day])) {
@@ -190,7 +191,7 @@ class Bookflow_Locations {
             }
         }
         $parse_dates = function ($raw) {
-            return array_values(array_filter(array_map('trim', preg_split('/[\r\n]+/', (string) wp_unslash($raw)))));
+            return array_values(array_filter(array_map('trim', preg_split('/[\r\n]+/', (string) $raw))));
         };
 
         return [
@@ -199,11 +200,12 @@ class Bookflow_Locations {
             'lat'            => sanitize_text_field(wp_unslash($_POST['lat'] ?? '')),
             'lng'            => sanitize_text_field(wp_unslash($_POST['lng'] ?? '')),
             'available_days' => $days,
-            'blocked_dates'  => $parse_dates($_POST['blocked_dates'] ?? ''),
-            'holidays'       => $parse_dates($_POST['holidays'] ?? ''),
+            'blocked_dates'  => $parse_dates(wp_unslash($_POST['blocked_dates'] ?? '')),
+            'holidays'       => $parse_dates(wp_unslash($_POST['holidays'] ?? '')),
             'sort_order'     => absint($_POST['sort_order'] ?? 0),
             'status'         => sanitize_text_field(wp_unslash($_POST['status'] ?? 'active')),
         ];
+        // phpcs:enable
     }
 
     /**

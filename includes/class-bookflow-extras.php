@@ -108,7 +108,7 @@ class Bookflow_Extras {
         $data = [
             'title'       => sanitize_text_field(wp_unslash($_POST['title'] ?? '')),
             'description' => sanitize_textarea_field(wp_unslash($_POST['description'] ?? '')),
-            'price'       => (float) ($_POST['price'] ?? 0),
+            'price'       => (float) wp_unslash($_POST['price'] ?? 0),
             'sort_order'  => absint($_POST['sort_order'] ?? 0),
             'status'      => sanitize_text_field(wp_unslash($_POST['status'] ?? 'active')),
         ];
@@ -141,7 +141,7 @@ class Bookflow_Extras {
             $data = [
                 'title'       => sanitize_text_field(wp_unslash($_POST['title'] ?? '')),
                 'description' => sanitize_textarea_field(wp_unslash($_POST['description'] ?? '')),
-                'price'       => (float) ($_POST['price'] ?? 0),
+                'price'       => (float) wp_unslash($_POST['price'] ?? 0),
                 'sort_order'  => absint($_POST['sort_order'] ?? 0),
                 'status'      => sanitize_text_field(wp_unslash($_POST['status'] ?? 'active')),
             ];

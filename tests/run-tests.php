@@ -25,6 +25,7 @@
  * phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
  * phpcs:disable WordPress.NamingConventions.PrefixAllGlobals
  * phpcs:disable WordPress.DB.DirectDatabaseQuery
+ * phpcs:disable WordPress.PHP.DevelopmentFunctions.error_log_var_export
  */
 
 define('WP_USE_THEMES', false);

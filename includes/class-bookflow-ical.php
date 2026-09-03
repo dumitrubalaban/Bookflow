@@ -172,7 +172,7 @@ class Bookflow_iCal {
         if (!empty($b->notes))          $desc_parts[] = 'Notes: ' . $b->notes;
         $description = implode("\n", $desc_parts);
 
-        $host = parse_url(home_url(), PHP_URL_HOST) ?: 'bookflow';
+        $host = wp_parse_url(home_url(), PHP_URL_HOST) ?: 'bookflow';
         $status_map = [
             'pending' => 'TENTATIVE', 'confirmed' => 'CONFIRMED', 'paid' => 'CONFIRMED',
             'in-progress' => 'CONFIRMED', 'completed' => 'CONFIRMED',
