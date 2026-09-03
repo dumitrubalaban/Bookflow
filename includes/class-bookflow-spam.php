@@ -16,6 +16,10 @@ class Bookflow_Spam {
      *
      * @return bool True if the submission looks human, false to block it.
      */
+    // Called only from Bookflow_Cart::validate_booking(), which runs inside
+    // WooCommerce's own add-to-cart flow (see that method's docblock for why
+    // no bespoke nonce is required there).
+    // phpcs:disable WordPress.Security.NonceVerification.Missing
     public static function is_human() {
         // Honeypot: any value here means a bot filled every input on the form.
         if (!empty($_POST['bookflow_website'])) {
@@ -35,6 +39,7 @@ class Bookflow_Spam {
 
         return self::verify_recaptcha($token, $secret_key);
     }
+    // phpcs:enable WordPress.Security.NonceVerification.Missing
 
     /**
      * Verify a reCAPTCHA v3 token with Google, requiring a minimum score.

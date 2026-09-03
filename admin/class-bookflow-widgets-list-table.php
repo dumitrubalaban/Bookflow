@@ -112,27 +112,38 @@ class Bookflow_Widgets_List_Table extends WP_List_Table {
         $per_page = 20;
         $current_page = $this->get_pagenum();
 
-        $search = sanitize_text_field(wp_unslash($_REQUEST['s'] ?? ''));
+        $search = sanitize_text_field(wp_unslash($_REQUEST['s'] ?? '')); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only list table search filter, no state change
 
         global $wpdb;
+        // $where is always one of these two literal strings (never built
+        // from request data directly) — the actual search text only ever
+        // enters the query as a %s placeholder value below, so every
+        // query here can safely go through $wpdb->prepare(), including
+        // the no-search case (a query with no placeholders is a no-op for
+        // prepare() — it still requires the call, not a bypass).
         $where = '1=1';
-        $values = [];
+        $count_values = [];
         if ($search !== '') {
             $where = 'name LIKE %s';
-            $values[] = '%' . $wpdb->esc_like($search) . '%';
+            $count_values[] = '%' . $wpdb->esc_like($search) . '%';
         }
 
-        $orderby = sanitize_text_field(wp_unslash($_GET['orderby'] ?? 'name'));
-        $order = strtolower(sanitize_text_field(wp_unslash($_GET['order'] ?? 'asc'))) === 'desc' ? 'DESC' : 'ASC';
+        $orderby = sanitize_text_field(wp_unslash($_GET['orderby'] ?? 'name')); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only list table sort param, no state change
+        $order = strtolower(sanitize_text_field(wp_unslash($_GET['order'] ?? 'asc'))) === 'desc' ? 'DESC' : 'ASC'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only list table sort param, no state change
         $orderby = in_array($orderby, ['name', 'id'], true) ? $orderby : 'name';
 
-        $sql = "SELECT * FROM {$wpdb->prefix}bookflow_widgets WHERE $where ORDER BY $orderby $order";
-        $total_items = (int) $wpdb->get_var(
-            $values ? $wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}bookflow_widgets WHERE $where", ...$values) : "SELECT COUNT(*) FROM {$wpdb->prefix}bookflow_widgets"
-        );
+        // phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where is a fixed literal (0 or 1 %s placeholders) and $count_values/$list_values always match it exactly; custom table, no core API exists; live data required; phpcs can't verify placeholder counts statically
+        $total_items = (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$wpdb->prefix}bookflow_widgets WHERE $where",
+            ...$count_values
+        ));
 
-        $sql .= $wpdb->prepare(' LIMIT %d OFFSET %d', $per_page, ($current_page - 1) * $per_page);
-        $this->items = $values ? $wpdb->get_results($wpdb->prepare($sql, ...$values)) : $wpdb->get_results($sql);
+        $list_values = array_merge($count_values, [$per_page, ($current_page - 1) * $per_page]);
+        $this->items = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}bookflow_widgets WHERE $where ORDER BY $orderby $order LIMIT %d OFFSET %d",
+            ...$list_values
+        ));
+        // phpcs:enable
 
         $this->_column_headers = [$this->get_columns(), [], $this->get_sortable_columns()];
         $this->set_pagination_args([

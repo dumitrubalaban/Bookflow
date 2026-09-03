@@ -150,7 +150,7 @@ class Bookflow_Widgets {
      * it never touches the plain Widgets list screen.
      */
     public function admin_body_class($classes) {
-        if (isset($_GET['page']) && $_GET['page'] === 'bookflow-widgets' && !empty($_GET['view'])) {
+        if (isset($_GET['page']) && $_GET['page'] === 'bookflow-widgets' && !empty($_GET['view'])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only page/view detection, no state change
             $classes .= ' bookflow-widget-builder-fullscreen';
         }
         return $classes;
@@ -171,7 +171,7 @@ class Bookflow_Widgets {
         // Only the single-widget builder screen (?view=<id>|new) needs the
         // Svelte bundle — the plain list view is a native WP_List_Table,
         // same as Bookings' own list, with zero JS of its own.
-        if (strpos($hook, 'bookflow-widgets') === false || empty($_GET['view'])) {
+        if (strpos($hook, 'bookflow-widgets') === false || empty($_GET['view'])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only view-mode detection, no state change
             return;
         }
         $bundle_js = BOOKFLOW_PLUGIN_DIR . 'admin/dist/admin-widgets.js';
@@ -247,7 +247,7 @@ class Bookflow_Widgets {
             ];
         }
 
-        $view_param = sanitize_text_field(wp_unslash($_GET['view']));
+        $view_param = sanitize_text_field(wp_unslash($_GET['view'])); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only view-mode param, no state change
 
         wp_localize_script('bookflow-admin-widgets', 'bookflowAdminWidgets', [
             'ajaxUrl'           => admin_url('admin-ajax.php'),
@@ -354,7 +354,7 @@ class Bookflow_Widgets {
         // WP_List_Table posts here with its own bulk-<plural> nonce.
         if (!empty($_POST['widget_ids']) && !empty($_POST['action']) && $_POST['action'] === 'delete') {
             check_admin_referer('bulk-widgets');
-            foreach ((array) $_POST['widget_ids'] as $id) {
+            foreach ((array) wp_unslash($_POST['widget_ids']) as $id) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- each element sanitized via absint() below
                 self::delete(absint($id));
             }
             echo '<div class="notice notice-success is-dismissible"><p>' . esc_html(Bookflow_I18n::t('admin.widget_deleted')) . '</p></div>';
@@ -553,7 +553,7 @@ class Bookflow_Widgets {
             wp_send_json_error(['message' => 'Unauthorized']);
         }
         global $wpdb;
-        $linked_ids = $wpdb->get_col("SELECT product_id FROM {$wpdb->prefix}bookflow_widgets WHERE product_id IS NOT NULL");
+        $linked_ids = $wpdb->get_col("SELECT product_id FROM {$wpdb->prefix}bookflow_widgets WHERE product_id IS NOT NULL"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
         $products = function_exists('wc_get_products') ? wc_get_products([
             'limit' => -1, 'type' => ['booking'], 'orderby' => 'title', 'order' => 'ASC',
         ]) : [];
@@ -579,13 +579,13 @@ class Bookflow_Widgets {
             wp_send_json_error(['message' => Bookflow_I18n::t('admin.widget_name')]);
         }
 
-        $style_raw = isset($_POST['style']) ? json_decode(wp_unslash($_POST['style']), true) : [];
+        $style_raw = isset($_POST['style']) ? json_decode(wp_unslash($_POST['style']), true) : []; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- decoded JSON is sanitized field-by-field in self::sanitize_style() below
         $style = self::sanitize_style(is_array($style_raw) ? $style_raw : []);
 
-        $steps_raw = isset($_POST['steps']) ? json_decode(wp_unslash($_POST['steps']), true) : [];
+        $steps_raw = isset($_POST['steps']) ? json_decode(wp_unslash($_POST['steps']), true) : []; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- decoded JSON is sanitized field-by-field in self::sanitize_steps() below
         $steps = self::sanitize_steps(is_array($steps_raw) ? $steps_raw : []);
 
-        $text_raw = isset($_POST['text']) ? json_decode(wp_unslash($_POST['text']), true) : [];
+        $text_raw = isset($_POST['text']) ? json_decode(wp_unslash($_POST['text']), true) : []; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- decoded JSON is sanitized field-by-field in self::sanitize_text() below
         $text = self::sanitize_text(is_array($text_raw) ? $text_raw : []);
 
         $is_default = !empty($_POST['is_default']) ? 1 : 0;
@@ -687,17 +687,17 @@ class Bookflow_Widgets {
 
     public static function get_all() {
         global $wpdb;
-        return $wpdb->get_results("SELECT * FROM {$wpdb->prefix}bookflow_widgets ORDER BY id ASC");
+        return $wpdb->get_results("SELECT * FROM {$wpdb->prefix}bookflow_widgets ORDER BY id ASC"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
     }
 
     public static function get($id) {
         global $wpdb;
-        return $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}bookflow_widgets WHERE id = %d", $id));
+        return $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}bookflow_widgets WHERE id = %d", $id)); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
     }
 
     public static function get_by_product_id($product_id) {
         global $wpdb;
-        return $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}bookflow_widgets WHERE product_id = %d", $product_id));
+        return $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}bookflow_widgets WHERE product_id = %d", $product_id)); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
     }
 
     public static function create($data) {
@@ -705,7 +705,7 @@ class Bookflow_Widgets {
         if (!empty($data['is_default'])) {
             self::clear_default();
         }
-        $wpdb->insert($wpdb->prefix . 'bookflow_widgets', $data);
+        $wpdb->insert($wpdb->prefix . 'bookflow_widgets', $data); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
         return (int) $wpdb->insert_id;
     }
 
@@ -714,7 +714,7 @@ class Bookflow_Widgets {
         if (!empty($data['is_default'])) {
             self::clear_default();
         }
-        $wpdb->update($wpdb->prefix . 'bookflow_widgets', $data, ['id' => $id]);
+        $wpdb->update($wpdb->prefix . 'bookflow_widgets', $data, ['id' => $id]); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
         return true;
     }
 
@@ -723,12 +723,12 @@ class Bookflow_Widgets {
         // The linked WC product is deliberately left alone — deleting the
         // widget preset shouldn't delete a real product with its own order
         // history; it just stops having an owning widget.
-        $wpdb->delete($wpdb->prefix . 'bookflow_widgets', ['id' => $id]);
+        $wpdb->delete($wpdb->prefix . 'bookflow_widgets', ['id' => $id]); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
     }
 
     private static function clear_default() {
         global $wpdb;
-        $wpdb->update($wpdb->prefix . 'bookflow_widgets', ['is_default' => 0], ['is_default' => 1]);
+        $wpdb->update($wpdb->prefix . 'bookflow_widgets', ['is_default' => 0], ['is_default' => 1]); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
     }
 
     /**
@@ -874,7 +874,7 @@ class Bookflow_Widgets {
 
         if (!$row) {
             global $wpdb;
-            $row = $wpdb->get_row("SELECT * FROM {$wpdb->prefix}bookflow_widgets WHERE is_default = 1 LIMIT 1");
+            $row = $wpdb->get_row("SELECT * FROM {$wpdb->prefix}bookflow_widgets WHERE is_default = 1 LIMIT 1"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
         }
 
         if (!$row) {

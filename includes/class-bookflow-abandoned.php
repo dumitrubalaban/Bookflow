@@ -43,12 +43,14 @@ class Bookflow_Abandoned {
         global $wpdb;
         $table = $wpdb->prefix . 'bookflow_abandoned_bookings';
 
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- custom table, no core API exists; live data required for booking/availability integrity; $table is $wpdb->prefix + a literal suffix, never request data; real values go through %d/%s + $wpdb->prepare()
         $existing_id = $wpdb->get_var($wpdb->prepare(
             "SELECT id FROM $table WHERE product_id = %d AND recovered = 0
              AND ((email != '' AND email = %s) OR (phone != '' AND phone = %s))
              ORDER BY id DESC LIMIT 1",
             $product_id, $email, $phone
         ));
+        // phpcs:enable
 
         $data = [
             'product_id'   => $product_id,
@@ -59,9 +61,9 @@ class Bookflow_Abandoned {
         ];
 
         if ($existing_id) {
-            $wpdb->update($table, $data, ['id' => (int) $existing_id]);
+            $wpdb->update($table, $data, ['id' => (int) $existing_id]); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
         } else {
-            $wpdb->insert($table, $data);
+            $wpdb->insert($table, $data); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
         }
 
         wp_send_json_success();
@@ -85,12 +87,14 @@ class Bookflow_Abandoned {
         // passing a PHP-computed cutoff — the app server's clock isn't
         // guaranteed to agree with the DB server's, and `created_at` is
         // populated by the DB's own CURRENT_TIMESTAMP.
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- custom table, no core API exists; live data required for booking/availability integrity; $table is $wpdb->prefix + a literal suffix, never request data; real values go through %d/%s + $wpdb->prepare()
         $wpdb->query($wpdb->prepare(
             "UPDATE $table SET recovered = 1
              WHERE recovered = 0 AND created_at >= DATE_SUB(NOW(), INTERVAL 48 HOUR)
              AND ((email != '' AND email = %s) OR (phone != '' AND phone = %s))",
             $email, $phone
         ));
+        // phpcs:enable
     }
 
     /**
@@ -101,20 +105,22 @@ class Bookflow_Abandoned {
         global $wpdb;
         $table = $wpdb->prefix . 'bookflow_abandoned_bookings';
 
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- custom table, no core API exists; live data required for booking/availability integrity; $table is $wpdb->prefix + a literal suffix, never request data; real values go through %d/%s + $wpdb->prepare()
         $rows = $wpdb->get_results(
             "SELECT * FROM $table WHERE recovered = 0 AND followup_sent_at IS NULL
              AND created_at <= DATE_SUB(NOW(), INTERVAL 1 HOUR) LIMIT 50"
         );
+        // phpcs:enable
 
         foreach ($rows as $row) {
             if (!$row->email) {
                 // No email captured (phone-only) — nothing to send to; mark
                 // sent so it isn't retried forever.
-                $wpdb->query($wpdb->prepare("UPDATE $table SET followup_sent_at = NOW() WHERE id = %d", $row->id));
+                $wpdb->query($wpdb->prepare("UPDATE $table SET followup_sent_at = NOW() WHERE id = %d", $row->id)); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- custom table, no core API exists; live data required for booking/availability integrity; table/sql var built only from fixed literals ($wpdb->prefix + literal string or %d/%s placeholders resolved via $wpdb->prepare()), never from unescaped request data
                 continue;
             }
             self::send_followup_email($row);
-            $wpdb->update($table, ['followup_sent_at' => current_time('mysql', true)], ['id' => $row->id]);
+            $wpdb->update($table, ['followup_sent_at' => current_time('mysql', true)], ['id' => $row->id]); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
         }
     }
 

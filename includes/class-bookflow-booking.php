@@ -63,12 +63,13 @@ class Bookflow_Booking {
         }
 
         // Concurrency check: verify slot is still available before insert
-        $wpdb->query('START TRANSACTION');
+        $wpdb->query('START TRANSACTION'); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
 
         // Lock rows for this slot to prevent concurrent overbooking
         // Scope by schedule_id if provided (each schedule has its own capacity)
         $schedule_id = $data['schedule_id'] ? absint($data['schedule_id']) : null;
 
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- custom table, no core API exists; live data required for booking/availability integrity; $table is built only from $wpdb->prefix + a literal suffix, never from request data; all real values go through %d/%s + $wpdb->prepare()
         if ($schedule_id) {
             $slot_data = $wpdb->get_row($wpdb->prepare(
                 "SELECT COUNT(*) as booking_count, COALESCE(SUM(persons_total), 0) as booked_persons
@@ -94,6 +95,7 @@ class Bookflow_Booking {
                 $data['start_time']
             ));
         }
+        // phpcs:enable
 
         $slot_count = (int) $slot_data->booking_count;
         $booked_persons = (int) $slot_data->booked_persons;
@@ -123,14 +125,14 @@ class Bookflow_Booking {
         }
 
         if ($slot_count >= $max_per_slot) {
-            $wpdb->query('ROLLBACK');
+            $wpdb->query('ROLLBACK'); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             return new WP_Error('slot_taken', Bookflow_I18n::t('error.slot_taken'));
         }
 
         // Check person capacity
         $requested_persons = max(1, absint($data['persons_total']));
         if (($booked_persons + $requested_persons) > $max_persons) {
-            $wpdb->query('ROLLBACK');
+            $wpdb->query('ROLLBACK'); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             $remaining = $max_persons - $booked_persons;
             return new WP_Error(
                 'capacity_exceeded',
@@ -141,11 +143,12 @@ class Bookflow_Booking {
         // Check resource capacity (rows for this slot are already locked above)
         $resource_id_val = $data['resource_id'] ? absint($data['resource_id']) : null;
         if ($resource_id_val) {
-            $resource = $wpdb->get_row($wpdb->prepare(
+            $resource = $wpdb->get_row($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
                 "SELECT capacity FROM {$wpdb->prefix}bookflow_resources WHERE id = %d AND status = 'active'",
                 $resource_id_val
             ));
             if ($resource && (int) $resource->capacity > 0) {
+                // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- custom table, no core API exists; live data required for booking/availability integrity; $table is built only from $wpdb->prefix + a literal suffix, never from request data; all real values go through %d/%s + $wpdb->prepare()
                 $resource_booked = (int) $wpdb->get_var($wpdb->prepare(
                     "SELECT COALESCE(SUM(persons_total), 0) FROM $table
                      WHERE resource_id = %d AND booking_date = %s AND start_time = %s
@@ -154,8 +157,9 @@ class Bookflow_Booking {
                     $data['booking_date'],
                     $data['start_time']
                 ));
+                // phpcs:enable
                 if (($resource_booked + $requested_persons) > (int) $resource->capacity) {
-                    $wpdb->query('ROLLBACK');
+                    $wpdb->query('ROLLBACK'); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
                     $remaining = (int) $resource->capacity - $resource_booked;
                     return new WP_Error(
                         'resource_capacity_exceeded',
@@ -165,7 +169,7 @@ class Bookflow_Booking {
             }
         }
 
-        $result = $wpdb->insert($table, [
+        $result = $wpdb->insert($table, [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             'product_id'      => absint($data['product_id']),
             'resource_id'     => $data['resource_id'] ? absint($data['resource_id']) : null,
             'schedule_id'     => $schedule_id,
@@ -192,12 +196,12 @@ class Bookflow_Booking {
         ]);
 
         if ($result === false) {
-            $wpdb->query('ROLLBACK');
+            $wpdb->query('ROLLBACK'); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             return new WP_Error('db_error', Bookflow_I18n::t('error.could_not_create'));
         }
 
         $booking_id = $wpdb->insert_id;
-        $wpdb->query('COMMIT');
+        $wpdb->query('COMMIT'); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
 
         // Fire action for cache invalidation, logging, emails
         do_action('bookflow_booking_created', $data, $booking_id);
@@ -215,7 +219,7 @@ class Bookflow_Booking {
     public static function get($id) {
         global $wpdb;
         $table = $wpdb->prefix . 'bookflow_bookings';
-        return $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id = %d", absint($id)));
+        return $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id = %d", absint($id))); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- custom table, no core API exists; live data required for booking/availability integrity; table/sql var built only from fixed literals ($wpdb->prefix + literal string or %d/%s placeholders resolved via $wpdb->prepare()), never from unescaped request data
     }
 
     /**
@@ -248,7 +252,7 @@ class Bookflow_Booking {
 
         $old = self::get($id);
 
-        $result = $wpdb->update($table, $update, ['id' => absint($id)], $format, ['%d']);
+        $result = $wpdb->update($table, $update, ['id' => absint($id)], $format, ['%d']); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
 
         if ($result !== false) {
             do_action('bookflow_booking_updated', $id, $update, $old);
@@ -307,7 +311,7 @@ class Bookflow_Booking {
                 break;
         }
 
-        $result = $wpdb->update($table, $update_data, ['id' => absint($id)]);
+        $result = $wpdb->update($table, $update_data, ['id' => absint($id)]); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
 
         if ($result === false) {
             return new WP_Error('db_error', Bookflow_I18n::t('error.could_not_update_status'));
@@ -341,8 +345,8 @@ class Bookflow_Booking {
     public static function get_by_date($product_id, $date) {
         global $wpdb;
         $table = $wpdb->prefix . 'bookflow_bookings';
-        return $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM $table WHERE product_id = %d AND booking_date = %s AND status NOT IN ('cancelled', 'refunded') AND deleted_at IS NULL",
+        return $wpdb->get_results($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter -- custom table, no core API exists; live data required for booking/availability integrity; table/sql var built only from fixed literals ($wpdb->prefix + literal string or %d/%s placeholders resolved via $wpdb->prepare()), never from unescaped request data
+            "SELECT * FROM $table WHERE product_id = %d AND booking_date = %s AND status NOT IN ('cancelled', 'refunded') AND deleted_at IS NULL", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $table is $wpdb->prefix + a literal suffix, never request data
             absint($product_id),
             $date
         ));
@@ -355,7 +359,7 @@ class Bookflow_Booking {
         global $wpdb;
         $table = $wpdb->prefix . 'bookflow_bookings';
 
-        $sql = "SELECT COUNT(*) FROM $table WHERE product_id = %d AND booking_date = %s AND start_time = %s AND status NOT IN ('cancelled', 'refunded') AND deleted_at IS NULL";
+        $sql = "SELECT COUNT(*) FROM $table WHERE product_id = %d AND booking_date = %s AND start_time = %s AND status NOT IN ('cancelled', 'refunded') AND deleted_at IS NULL"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $table is $wpdb->prefix + a literal suffix, never request data; real values go through %d/%s + $wpdb->prepare() below
         $params = [absint($product_id), $date, $start_time];
 
         if ($resource_id) {
@@ -368,7 +372,7 @@ class Bookflow_Booking {
             $params[] = absint($schedule_id);
         }
 
-        return (int) $wpdb->get_var($wpdb->prepare($sql, ...$params));
+        return (int) $wpdb->get_var($wpdb->prepare($sql, ...$params)); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- built only from fixed literals + %d/%s placeholders; real values always passed through $wpdb->prepare()
     }
 
     /**
@@ -378,7 +382,7 @@ class Bookflow_Booking {
         global $wpdb;
         $table = $wpdb->prefix . 'bookflow_bookings';
 
-        $sql = "SELECT COALESCE(SUM(persons_total), 0) FROM $table WHERE product_id = %d AND booking_date = %s AND start_time = %s AND status NOT IN ('cancelled', 'refunded') AND deleted_at IS NULL";
+        $sql = "SELECT COALESCE(SUM(persons_total), 0) FROM $table WHERE product_id = %d AND booking_date = %s AND start_time = %s AND status NOT IN ('cancelled', 'refunded') AND deleted_at IS NULL"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $table is $wpdb->prefix + a literal suffix, never request data; real values go through %d/%s + $wpdb->prepare() below
         $params = [absint($product_id), $date, $start_time];
 
         if ($resource_id) {
@@ -391,7 +395,7 @@ class Bookflow_Booking {
             $params[] = absint($schedule_id);
         }
 
-        return (int) $wpdb->get_var($wpdb->prepare($sql, ...$params));
+        return (int) $wpdb->get_var($wpdb->prepare($sql, ...$params)); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- built only from fixed literals + %d/%s placeholders; real values always passed through $wpdb->prepare()
     }
 
     /**
@@ -410,11 +414,13 @@ class Bookflow_Booking {
 
         $window_start = gmdate('H:i:s', strtotime($start_time) - ($buffer_minutes * 60));
 
+        // phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- $table is $wpdb->prefix + a literal suffix, never request data; real values go through %d/%s + $wpdb->prepare() below
         $sql = "SELECT COUNT(*) FROM $table
                 WHERE product_id = %d AND booking_date = %s
                 AND status NOT IN ('cancelled', 'refunded') AND deleted_at IS NULL
                 AND end_time IS NOT NULL
                 AND end_time > %s AND end_time <= %s";
+        // phpcs:enable
         $params = [absint($product_id), $date, $window_start, $start_time];
 
         if ($resource_id) {
@@ -427,7 +433,7 @@ class Bookflow_Booking {
             $params[] = absint($schedule_id);
         }
 
-        return (int) $wpdb->get_var($wpdb->prepare($sql, ...$params)) > 0;
+        return (int) $wpdb->get_var($wpdb->prepare($sql, ...$params)) > 0; // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- built only from fixed literals + %d/%s placeholders; real values always passed through $wpdb->prepare()
     }
 
     /**
@@ -531,7 +537,7 @@ class Bookflow_Booking {
         $values[] = $limit;
         $values[] = $offset;
 
-        return $wpdb->get_results($wpdb->prepare($sql, ...$values));
+        return $wpdb->get_results($wpdb->prepare($sql, ...$values)); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- built only from fixed literals + %d/%s placeholders; real values always passed through $wpdb->prepare()
     }
 
     /**
@@ -590,10 +596,10 @@ class Bookflow_Booking {
         $sql = "SELECT COUNT(*) FROM $table WHERE $where_clause";
 
         if (!empty($values)) {
-            return (int) $wpdb->get_var($wpdb->prepare($sql, ...$values));
+            return (int) $wpdb->get_var($wpdb->prepare($sql, ...$values)); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- built only from fixed literals + %d/%s placeholders; real values always passed through $wpdb->prepare()
         }
 
-        return (int) $wpdb->get_var($sql);
+        return (int) $wpdb->get_var($sql); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- built only from fixed literals + %d/%s placeholders; real values always passed through $wpdb->prepare()
     }
 
     /**
@@ -623,10 +629,10 @@ class Bookflow_Booking {
         $sql = "SELECT COALESCE(SUM(cost), 0) as total_revenue, COUNT(*) as total_bookings, COALESCE(SUM(persons_total), 0) as total_persons FROM $table WHERE $where_clause";
 
         if (!empty($values)) {
-            return $wpdb->get_row($wpdb->prepare($sql, ...$values));
+            return $wpdb->get_row($wpdb->prepare($sql, ...$values)); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- built only from fixed literals + %d/%s placeholders; real values always passed through $wpdb->prepare()
         }
 
-        return $wpdb->get_row($sql);
+        return $wpdb->get_row($sql); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- built only from fixed literals + %d/%s placeholders; real values always passed through $wpdb->prepare()
     }
 
     /**
@@ -646,7 +652,7 @@ class Bookflow_Booking {
         $sql = "SELECT booking_date as date, COALESCE(SUM(cost), 0) as revenue, COUNT(*) as bookings
                 FROM $table WHERE $where_clause GROUP BY booking_date ORDER BY booking_date ASC";
 
-        return !empty($values) ? $wpdb->get_results($wpdb->prepare($sql, ...$values)) : $wpdb->get_results($sql);
+        return !empty($values) ? $wpdb->get_results($wpdb->prepare($sql, ...$values)) : $wpdb->get_results($sql); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- built only from fixed literals + %d/%s placeholders; real values always passed through $wpdb->prepare()
     }
 
     /**
@@ -666,7 +672,7 @@ class Bookflow_Booking {
         $sql = "SELECT product_id, COALESCE(SUM(cost), 0) as revenue, COUNT(*) as bookings
                 FROM $table WHERE $where_clause GROUP BY product_id ORDER BY revenue DESC LIMIT 10";
 
-        return !empty($values) ? $wpdb->get_results($wpdb->prepare($sql, ...$values)) : $wpdb->get_results($sql);
+        return !empty($values) ? $wpdb->get_results($wpdb->prepare($sql, ...$values)) : $wpdb->get_results($sql); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- built only from fixed literals + %d/%s placeholders; real values always passed through $wpdb->prepare()
     }
 
     /**
@@ -683,13 +689,13 @@ class Bookflow_Booking {
         Bookflow_Logger::log('booking_deleted', $id, ['old' => (array) $booking]);
 
         // Delete person type entries
-        $wpdb->delete($wpdb->prefix . 'bookflow_booking_persons', ['booking_id' => absint($id)], ['%d']);
+        $wpdb->delete($wpdb->prefix . 'bookflow_booking_persons', ['booking_id' => absint($id)], ['%d']); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
 
         // Delete log entries
-        $wpdb->delete($wpdb->prefix . 'bookflow_log', ['booking_id' => absint($id)], ['%d']);
+        $wpdb->delete($wpdb->prefix . 'bookflow_log', ['booking_id' => absint($id)], ['%d']); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
 
         // Delete the booking
-        $result = $wpdb->delete($wpdb->prefix . 'bookflow_bookings', ['id' => absint($id)], ['%d']);
+        $result = $wpdb->delete($wpdb->prefix . 'bookflow_bookings', ['id' => absint($id)], ['%d']); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
 
         if ($result) {
             do_action('bookflow_booking_deleted', $id, $booking);
@@ -711,7 +717,7 @@ class Bookflow_Booking {
             return false;
         }
 
-        $result = $wpdb->update(
+        $result = $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             $wpdb->prefix . 'bookflow_bookings',
             ['deleted_at' => current_time('mysql')],
             ['id' => absint($id)]
@@ -735,7 +741,7 @@ class Bookflow_Booking {
             return false;
         }
 
-        $result = $wpdb->update(
+        $result = $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             $wpdb->prefix . 'bookflow_bookings',
             ['deleted_at' => null],
             ['id' => absint($id)]
@@ -860,7 +866,7 @@ class Bookflow_Booking {
         $limit = max(1, absint($limit));
 
         $id_sql = "SELECT id, product_id FROM $table WHERE $where_sql ORDER BY id ASC LIMIT %d";
-        $rows = $wpdb->get_results($wpdb->prepare($id_sql, ...array_merge($values, [$limit])));
+        $rows = $wpdb->get_results($wpdb->prepare($id_sql, ...array_merge($values, [$limit]))); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- built only from fixed literals + %d/%s placeholders; real values always passed through $wpdb->prepare()
 
         if (empty($rows)) {
             return ['deleted' => 0, 'ids' => []];
@@ -870,9 +876,9 @@ class Bookflow_Booking {
         $product_ids = array_unique(array_map(fn($r) => (int) $r->product_id, $rows));
         $id_placeholders = implode(',', array_fill(0, count($ids), '%d'));
 
-        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}bookflow_booking_persons WHERE booking_id IN ($id_placeholders)", ...$ids));
-        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}bookflow_log WHERE booking_id IN ($id_placeholders)", ...$ids));
-        $deleted = $wpdb->query($wpdb->prepare("DELETE FROM $table WHERE id IN ($id_placeholders)", ...$ids));
+        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}bookflow_booking_persons WHERE booking_id IN ($id_placeholders)", ...$ids)); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- custom table, no core API exists; live data required for booking/availability integrity; $id_placeholders always has exactly count($ids) %d placeholders matching the spread $ids args, phpcs can't see that statically
+        $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}bookflow_log WHERE booking_id IN ($id_placeholders)", ...$ids)); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- custom table, no core API exists; live data required for booking/availability integrity; $id_placeholders always has exactly count($ids) %d placeholders matching the spread $ids args, phpcs can't see that statically
+        $deleted = $wpdb->query($wpdb->prepare("DELETE FROM $table WHERE id IN ($id_placeholders)", ...$ids)); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- custom table, no core API exists; live data required for booking/availability integrity; table/sql var built only from fixed literals ($wpdb->prefix + literal string or %d/%s placeholders resolved via $wpdb->prepare()), never from unescaped request data
 
         Bookflow_Logger::log('bulk_deleted', null, [
             'count'  => $deleted,
@@ -949,7 +955,7 @@ class Bookflow_Booking {
         $limit = max(1, absint($limit));
 
         $id_sql = "SELECT id FROM $table WHERE $where_sql ORDER BY id ASC LIMIT %d";
-        $ids = $wpdb->get_col($wpdb->prepare($id_sql, ...array_merge($values, [$limit])));
+        $ids = $wpdb->get_col($wpdb->prepare($id_sql, ...array_merge($values, [$limit]))); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- built only from fixed literals + %d/%s placeholders; real values always passed through $wpdb->prepare()
         $ids = array_map('intval', $ids);
 
         if (empty($ids)) {
@@ -957,10 +963,12 @@ class Bookflow_Booking {
         }
 
         $id_placeholders = implode(',', array_fill(0, count($ids), '%d'));
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- $id_placeholders always has exactly count($ids) %d placeholders and args pass exactly that many ids after the %s; $table is $wpdb->prefix + a literal suffix; phpcs can't see any of this statically
         $trashed = $wpdb->query($wpdb->prepare(
             "UPDATE $table SET deleted_at = %s WHERE id IN ($id_placeholders)",
             current_time('mysql'), ...$ids
         ));
+        // phpcs:enable
 
         Bookflow_Logger::log('bulk_trashed', null, [
             'count'  => $trashed,
@@ -981,14 +989,14 @@ class Bookflow_Booking {
         $table = $wpdb->prefix . 'bookflow_booking_persons';
 
         // Delete existing
-        $wpdb->delete($table, ['booking_id' => absint($booking_id)], ['%d']);
+        $wpdb->delete($table, ['booking_id' => absint($booking_id)], ['%d']); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
 
         // Insert new
         foreach ($person_types as $pt) {
             if (empty($pt['quantity']) || $pt['quantity'] < 1) {
                 continue;
             }
-            $wpdb->insert($table, [
+            $wpdb->insert($table, [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
                 'booking_id'      => absint($booking_id),
                 'person_type_id'  => absint($pt['person_type_id']),
                 'quantity'        => absint($pt['quantity']),
@@ -1002,7 +1010,7 @@ class Bookflow_Booking {
      */
     public static function get_person_types($booking_id) {
         global $wpdb;
-        return $wpdb->get_results($wpdb->prepare(
+        return $wpdb->get_results($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT bp.*, pt.name as type_name
              FROM {$wpdb->prefix}bookflow_booking_persons bp
              LEFT JOIN {$wpdb->prefix}bookflow_person_types pt ON bp.person_type_id = pt.id

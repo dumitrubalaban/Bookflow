@@ -55,7 +55,7 @@ class Bookflow_Admin {
      * custom control.
      */
     public function screen_options() {
-        if (!empty($_GET['view'])) {
+        if (!empty($_GET['view'])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only view-mode switch, no state change
             return; // no screen options on the single-booking detail view
         }
         add_screen_option('per_page', [
@@ -77,10 +77,12 @@ class Bookflow_Admin {
 
     public function bookings_page() {
         // Detail view
+        // phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only view-mode switch, no state change
         if (!empty($_GET['view'])) {
             $this->booking_detail_page(absint($_GET['view']));
             return;
         }
+        // phpcs:enable
 
         if (!current_user_can('manage_woocommerce')) {
             wp_die('Unauthorized');

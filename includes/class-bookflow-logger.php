@@ -22,7 +22,7 @@ class Bookflow_Logger {
     public static function log($action, $booking_id = null, $data = []) {
         global $wpdb;
 
-        $wpdb->insert(
+        $wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             $wpdb->prefix . 'bookflow_log',
             [
                 'booking_id' => $booking_id ? absint($booking_id) : null,
@@ -55,7 +55,7 @@ class Bookflow_Logger {
      */
     public static function get_booking_logs($booking_id, $limit = 50) {
         global $wpdb;
-        return $wpdb->get_results($wpdb->prepare(
+        return $wpdb->get_results($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT l.*, u.display_name as user_name
              FROM {$wpdb->prefix}bookflow_log l
              LEFT JOIN {$wpdb->users} u ON l.user_id = u.ID

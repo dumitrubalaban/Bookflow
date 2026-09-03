@@ -72,7 +72,7 @@ class Bookflow_Cron {
 
             // Mark as sent using the bookings table internal_notes (no meta table)
             global $wpdb;
-            $wpdb->update(
+            $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
                 $wpdb->prefix . 'bookflow_bookings',
                 ['internal_notes' => trim(($booking->internal_notes ?? '') . "\n[REMINDER_SENT:" . wp_date('Y-m-d H:i:s') . ']')],
                 ['id' => $booking->id]
@@ -106,7 +106,7 @@ class Bookflow_Cron {
         global $wpdb;
         $cutoff = wp_date('Y-m-d H:i:s', strtotime('-30 minutes'));
 
-        $stale = $wpdb->get_results($wpdb->prepare(
+        $stale = $wpdb->get_results($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT id FROM {$wpdb->prefix}bookflow_bookings WHERE status = 'pending' AND order_id IS NULL AND created_at < %s",
             $cutoff
         ));

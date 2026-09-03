@@ -54,7 +54,7 @@ class Bookflow_My_Bookings {
             return;
         }
 
-        $tab = sanitize_text_field(wp_unslash($_GET['booking_tab'] ?? 'upcoming'));
+        $tab = sanitize_text_field(wp_unslash($_GET['booking_tab'] ?? 'upcoming')); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only tab switch, no state change
 
         $args = [
             'customer_id' => $customer_id,

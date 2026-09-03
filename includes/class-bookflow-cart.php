@@ -57,7 +57,18 @@ class Bookflow_Cart {
 
     /**
      * Validate booking before adding to cart
+     *
+     * Hooked to woocommerce_add_to_cart_validation, which only fires from
+     * WooCommerce's own add-to-cart handling. WooCommerce's classic
+     * single-product add-to-cart form does not itself carry a nonce (the
+     * same is true of WC_Form_Handler::add_to_cart_action()) — the action
+     * only ever adds an item to the current visitor's own cart, so the
+     * worst case of a forged request is an unwanted cart item, not a
+     * privileged state change. Adding a bespoke nonce here would diverge
+     * from WooCommerce's own add-to-cart contract and break themes/AJAX
+     * add-to-cart integrations that call this hook directly.
      */
+    // phpcs:disable WordPress.Security.NonceVerification.Missing
     public function validate_booking($valid, $product_id, $quantity) {
         $product = wc_get_product($product_id);
         if (!$product || $product->get_type() !== 'booking') {
@@ -112,7 +123,7 @@ class Bookflow_Cart {
         // Validate person count
         if (Bookflow_Person_Types::product_has_types($product_id)) {
             $person_types = isset($_POST['bookflow_person_types']) && is_array($_POST['bookflow_person_types'])
-                ? wp_unslash($_POST['bookflow_person_types'])
+                ? wp_unslash($_POST['bookflow_person_types']) // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- each element is sanitized with absint() in the loop below
                 : [];
             $persons_data = [];
             foreach ($person_types as $key => $pt) {
@@ -139,10 +150,16 @@ class Bookflow_Cart {
 
         return $valid;
     }
+    // phpcs:enable WordPress.Security.NonceVerification.Missing
 
     /**
      * Add booking data to cart item
+     *
+     * Hooked to woocommerce_add_cart_item_data, which only runs immediately
+     * after validate_booking() (above) has approved the same add-to-cart
+     * request — see that method's docblock for why no nonce is required.
      */
+    // phpcs:disable WordPress.Security.NonceVerification.Missing
     public function add_booking_data_to_cart($cart_item_data, $product_id, $variation_id) {
         $product = wc_get_product($product_id);
         if (!$product || $product->get_type() !== 'booking') {
@@ -214,7 +231,7 @@ class Bookflow_Cart {
         if (Bookflow_Person_Types::product_has_types($product_id) && !empty($_POST['bookflow_person_types'])) {
             $person_types = [];
             $total_persons = 0;
-            $raw_person_types = is_array($_POST['bookflow_person_types']) ? wp_unslash($_POST['bookflow_person_types']) : [];
+            $raw_person_types = is_array($_POST['bookflow_person_types']) ? wp_unslash($_POST['bookflow_person_types']) : []; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- each element is sanitized with absint() in the loop below
             foreach ($raw_person_types as $pt) {
                 $qty = absint($pt['quantity'] ?? 0);
                 if ($qty > 0) {
@@ -252,6 +269,7 @@ class Bookflow_Cart {
 
         return $cart_item_data;
     }
+    // phpcs:enable WordPress.Security.NonceVerification.Missing
 
     /**
      * Display booking info in cart

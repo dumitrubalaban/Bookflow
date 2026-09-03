@@ -117,7 +117,7 @@ class Bookflow_Locations {
     public static function create($data) {
         global $wpdb;
         $term_id = self::sync_tag(null, $data['name']);
-        $wpdb->insert($wpdb->prefix . 'bookflow_locations', [
+        $wpdb->insert($wpdb->prefix . 'bookflow_locations', [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             'name'           => sanitize_text_field($data['name']),
             'term_id'        => $term_id,
             'address'        => sanitize_text_field($data['address'] ?? ''),
@@ -134,7 +134,7 @@ class Bookflow_Locations {
 
     public static function get($id) {
         global $wpdb;
-        return $wpdb->get_row($wpdb->prepare(
+        return $wpdb->get_row($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT * FROM {$wpdb->prefix}bookflow_locations WHERE id = %d",
             absint($id)
         ));
@@ -142,12 +142,15 @@ class Bookflow_Locations {
 
     public static function get_all($status = null) {
         global $wpdb;
+        // $sql is only ever extended with fixed literal fragments — the
+        // one dynamic value ($status) already went through %s + prepare()
+        // above before the literal ORDER BY is appended.
         $sql = "SELECT * FROM {$wpdb->prefix}bookflow_locations";
         if ($status) {
-            $sql = $wpdb->prepare($sql . " WHERE status = %s", $status);
+            $sql = $wpdb->prepare($sql . " WHERE status = %s", $status); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
         }
         $sql .= " ORDER BY sort_order ASC, name ASC";
-        return $wpdb->get_results($sql);
+        return $wpdb->get_results($sql); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- $sql is either the fixed base query or that query with $status already substituted via prepare() above
     }
 
     public static function update($id, $data) {
@@ -167,12 +170,12 @@ class Bookflow_Locations {
         if (isset($data['sort_order']))     $update['sort_order'] = absint($data['sort_order']);
         if (isset($data['status']))         $update['status'] = sanitize_text_field($data['status']);
 
-        return $wpdb->update($wpdb->prefix . 'bookflow_locations', $update, ['id' => absint($id)]);
+        return $wpdb->update($wpdb->prefix . 'bookflow_locations', $update, ['id' => absint($id)]); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
     }
 
     public static function delete($id) {
         global $wpdb;
-        return $wpdb->delete($wpdb->prefix . 'bookflow_locations', ['id' => absint($id)], ['%d']);
+        return $wpdb->delete($wpdb->prefix . 'bookflow_locations', ['id' => absint($id)], ['%d']); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
     }
 
     private static function sanitize_coord($val) {
@@ -281,8 +284,8 @@ class Bookflow_Locations {
             'lat'            => sanitize_text_field(wp_unslash($_POST['lat'] ?? '')),
             'lng'            => sanitize_text_field(wp_unslash($_POST['lng'] ?? '')),
             'available_days' => $days,
-            'blocked_dates'  => $parse_dates(wp_unslash($_POST['blocked_dates'] ?? '')),
-            'holidays'       => $parse_dates(wp_unslash($_POST['holidays'] ?? '')),
+            'blocked_dates'  => $parse_dates(wp_unslash($_POST['blocked_dates'] ?? '')), // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized inside $parse_dates() via sanitize_textarea_field() + a strict YYYY-MM-DD regex filter
+            'holidays'       => $parse_dates(wp_unslash($_POST['holidays'] ?? '')), // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized inside $parse_dates() via sanitize_textarea_field() + a strict YYYY-MM-DD regex filter
             'sort_order'     => absint($_POST['sort_order'] ?? 0),
             'status'         => sanitize_text_field(wp_unslash($_POST['status'] ?? 'active')),
         ];

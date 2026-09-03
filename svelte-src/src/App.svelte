@@ -685,8 +685,8 @@
 {#if widgetCustomCss}
 <svelte:element this={"style"}>{widgetCustomCss}</svelte:element>
 {/if}
-<div bind:this={root} id="bookflow-booking-form" class="bookflow-wizard {widgetCustomClass}" style={widgetStyleVars}>
-<div class="relative w-full border border-bf-border bg-gradient-to-b from-bf-bg-alt to-bf-bg p-6 sm:p-9 text-white shadow-2xl shadow-black/40" style:border-radius={widgetRadius} style:padding={widgetPadding ? `calc(1.5rem + ${widgetPadding})` : ''}>
+<div bind:this={root} id="bookflow-booking-form" class="bookflow-wizard max-w-xl mx-auto {widgetCustomClass}" style={widgetStyleVars}>
+<div class="relative w-full border border-bf-border bg-bf-bg p-6 sm:p-8 text-gray-900 shadow-sm" style:border-radius={widgetRadius || '0.5rem'} style:padding={widgetPadding ? `calc(1.5rem + ${widgetPadding})` : ''}>
 
     <Stepper steps={stepperItems} currentIndex={currentIndexVisible} onJump={goToStep} />
 
@@ -736,18 +736,18 @@
         <input type="hidden" id="bookflow-language" value={langSelectedValue}>
         <div class="relative">
             <button type="button" on:click={() => langOpen = !langOpen}
-                    class="flex w-full items-center justify-between rounded-xl border border-bf-border bg-bf-bg-alt px-5 py-4 text-left transition-colors hover:border-bf-accent/50">
-                <span class={langSelectedLabel ? 'text-white' : 'text-white/40'}>{langSelectedLabel || i18n.selectOption || i18n.selectSchedule}</span>
-                <ChevronRight size={18} class="transition-transform duration-200 {langOpen ? 'rotate-90' : ''} text-white/50" />
+                    class="flex w-full items-center justify-between rounded-md border border-bf-border bg-bf-bg-alt px-4 py-3 text-left transition-colors hover:border-bf-accent/50">
+                <span class={langSelectedLabel ? 'text-gray-900' : 'text-gray-400'}>{langSelectedLabel || i18n.selectOption || i18n.selectSchedule}</span>
+                <ChevronRight size={18} class="transition-transform duration-200 {langOpen ? 'rotate-90' : ''} text-gray-500" />
             </button>
             {#if langOpen}
-            <div class="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-bf-border bg-bf-bg-alt shadow-xl">
+            <div class="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-bf-border bg-bf-bg-alt shadow-sm">
                 {#each uniqueLangOptions as opt}
                 <button type="button" on:click={() => pickLanguage(opt)}
                         class="flex w-full items-center justify-between px-5 py-3 text-left transition-colors hover:bg-bf-accent/15
-                            {langSelectedValue === opt.value ? 'bg-bf-accent/10 text-bf-accent' : 'bg-transparent'}">
-                    <span>{opt.label}</span>
-                    {#if langSelectedValue === opt.value}<Check size={16} />{/if}
+                            {langSelectedValue === opt.value ? 'bg-bf-accent/10' : 'bg-transparent'}">
+                    <span class={langSelectedValue === opt.value ? 'text-bf-accent' : 'text-gray-900'}>{opt.label}</span>
+                    {#if langSelectedValue === opt.value}<Check size={16} class="text-bf-accent" />{/if}
                 </button>
                 {/each}
             </div>
@@ -761,20 +761,20 @@
         <h3 class="mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.selectLocation}</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 transition-opacity {locationSwapping ? 'opacity-40 pointer-events-none' : ''}">
             {#if locationsLoading}
-                <div class="col-span-full flex flex-col items-center justify-center gap-3 py-10 text-white/50">
+                <div class="col-span-full flex flex-col items-center justify-center gap-3 py-10 text-gray-500">
                     <Loader2 size={28} class="animate-spin text-bf-accent" /><span>{i18n.loading}</span>
                 </div>
             {:else}
                 {#each locations as loc (loc.id)}
                 {@const selected = selectedLocationTag === loc.slug}
                 <button type="button" on:click={() => pickLocation(loc)}
-                        class="group relative rounded-2xl border bg-bf-bg-alt p-5 text-left transition-all duration-200 hover:-translate-y-1 hover:shadow-lg
-                            {selected ? 'border-bf-accent ring-2 ring-bf-accent/25' : 'border-bf-border hover:border-bf-accent/50'}">
+                        class="group relative rounded-md border bg-bf-bg-alt p-4 text-left transition-colors duration-150
+                            {selected ? 'border-bf-accent' : 'border-bf-border hover:border-bf-accent/50'}">
                     {#if selected}
-                    <span class="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-bf-accent text-white shadow"><Check size={14} strokeWidth={3} /></span>
+                    <span class="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-bf-accent text-white"><Check size={12} strokeWidth={3} /></span>
                     {/if}
-                    <div class="flex items-center gap-2 font-semibold"><MapPinned size={18} class="text-bf-accent" />{loc.name}</div>
-                    {#if loc.address}<p class="mt-1 pl-6 text-sm text-white/50">{loc.address}</p>{/if}
+                    <div class="flex items-center gap-2 font-semibold text-gray-900"><MapPinned size={18} class="text-bf-accent" />{loc.name}</div>
+                    {#if loc.address}<p class="mt-1 pl-6 text-sm text-gray-500">{loc.address}</p>{/if}
                 </button>
                 {/each}
             {/if}
@@ -785,36 +785,36 @@
     {#if currentStep === 'day'}
     <div>
         <h3 class="mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.selectDate}</h3>
-        <div class="rounded-2xl border border-bf-border bg-bf-bg-alt p-4 sm:p-5">
-            <div class="mb-4 flex items-center justify-between">
-                <button type="button" on:click={() => changeMonth(-1)} class="flex h-9 w-9 items-center justify-center rounded-full border border-bf-border bg-transparent transition-colors hover:border-bf-accent hover:text-bf-accent"><ChevronLeft size={18} /></button>
-                <span class="font-semibold tracking-wide">{monthName(month)} {year}</span>
-                <button type="button" on:click={() => changeMonth(1)} class="flex h-9 w-9 items-center justify-center rounded-full border border-bf-border bg-transparent transition-colors hover:border-bf-accent hover:text-bf-accent"><ChevronRight size={18} /></button>
+        <div class="max-w-xs mx-auto rounded-lg border border-bf-border bg-bf-bg-alt p-3 sm:p-4">
+            <div class="mb-3 flex items-center justify-between">
+                <button type="button" on:click={() => changeMonth(-1)} class="flex h-7 w-7 items-center justify-center rounded-md border border-bf-border bg-transparent transition-colors hover:border-bf-accent hover:text-bf-accent"><ChevronLeft size={14} class="text-gray-600" /></button>
+                <span class="text-sm font-semibold tracking-wide">{monthName(month)} {year}</span>
+                <button type="button" on:click={() => changeMonth(1)} class="flex h-7 w-7 items-center justify-center rounded-md border border-bf-border bg-transparent transition-colors hover:border-bf-accent hover:text-bf-accent"><ChevronRight size={14} class="text-gray-600" /></button>
             </div>
-            <div class="grid grid-cols-7 gap-1 text-center text-[11px] uppercase tracking-wide text-white/40">
+            <div class="grid grid-cols-7 gap-1 text-center text-[10px] uppercase tracking-wide text-gray-400">
                 {#each weekdayLabels as w}<span class="py-1">{w}</span>{/each}
             </div>
-            <div class="grid grid-cols-7 gap-1.5 mt-1">
+            <div class="grid grid-cols-7 gap-1 mt-1">
                 {#each calDays as cell}
                     {#if cell.type === 'skeleton'}
-                        <span class="aspect-square rounded-full bg-white/5 animate-pulse"></span>
+                        <span class="aspect-square rounded-full bg-gray-200 animate-pulse"></span>
                     {:else if cell.type === 'empty'}
                         <span class="aspect-square"></span>
                     {:else if cell.available}
                         <button type="button"
-                              class="aspect-square rounded-full bg-transparent text-sm font-medium transition-all duration-150 hover:bg-bf-accent/20
-                                  {cell.selected ? 'bg-bf-accent text-white shadow-md shadow-bf-accent/30' : 'text-white/85'}"
+                              class="aspect-square w-full rounded-full border-0 bg-transparent p-0 appearance-none font-medium transition-colors duration-150 hover:bg-bf-accent/20
+                                  {cell.selected ? 'bg-bf-accent' : ''}"
                               aria-label={formatDateLabel(cell.date) + ', ' + (i18n.available || 'available')}
                               aria-pressed={cell.selected ? 'true' : 'false'}
                               on:click={() => selectDate(cell.date)}>
-                            {cell.day}
+                            <span class="text-xs {cell.selected ? 'text-white' : 'text-gray-700'}">{cell.day}</span>
                         </button>
                     {:else}
-                        <span class="aspect-square flex items-center justify-center rounded-full text-sm text-white/15" aria-disabled="true">{cell.day}</span>
+                        <span class="aspect-square flex items-center justify-center rounded-full text-xs text-gray-300" aria-disabled="true">{cell.day}</span>
                     {/if}
                 {/each}
             </div>
-            {#if calMessage}<div class="pt-4 text-center text-sm text-white/50">{calMessage}</div>{/if}
+            {#if calMessage}<div class="pt-3 text-center text-xs text-gray-500">{calMessage}</div>{/if}
         </div>
     </div>
     {/if}
@@ -824,33 +824,33 @@
         <h3 class="mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.selectResource}</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {#if resourcesLoading}
-                <div class="col-span-full flex flex-col items-center justify-center gap-3 py-10 text-white/50">
+                <div class="col-span-full flex flex-col items-center justify-center gap-3 py-10 text-gray-500">
                     <Loader2 size={28} class="animate-spin text-bf-accent" /><span>{i18n.loading}</span>
                 </div>
             {:else if resourcesError}
-                <p class="col-span-full py-6 text-center text-white/50">{resourcesError}</p>
+                <p class="col-span-full py-6 text-center text-gray-500">{resourcesError}</p>
             {:else if !resources.length}
-                <p class="col-span-full py-6 text-center text-white/50">{i18n.noAvailability || 'No guides available this day.'}</p>
+                <p class="col-span-full py-6 text-center text-gray-500">{i18n.noAvailability || 'No guides available this day.'}</p>
             {:else}
                 {#each resources as r (r.id)}
                 {@const selected = selectedResource === String(r.id)}
                 <button type="button" on:click={() => pickResource(r)}
-                        class="group relative flex flex-col items-center gap-2 rounded-2xl border bg-bf-bg-alt p-5 text-center transition-all duration-200 hover:-translate-y-1 hover:shadow-lg
-                            {selected ? 'border-bf-accent ring-2 ring-bf-accent/25' : 'border-bf-border hover:border-bf-accent/50'}">
+                        class="group relative flex flex-col items-center gap-2 rounded-md border bg-bf-bg-alt p-4 text-center transition-colors duration-150
+                            {selected ? 'border-bf-accent' : 'border-bf-border hover:border-bf-accent/50'}">
                     {#if selected}
-                    <span class="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-bf-accent text-white shadow"><Check size={14} strokeWidth={3} /></span>
+                    <span class="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-bf-accent text-white"><Check size={12} strokeWidth={3} /></span>
                     {/if}
                     {#if r.photoUrl}
                         <img src={r.photoUrl} alt="" loading="lazy" class="h-16 w-16 rounded-full object-cover border-2 border-bf-border">
                     {:else}
                         <span class="flex h-16 w-16 items-center justify-center rounded-full bg-bf-accent/15 text-bf-accent font-bold text-lg">{r.title.charAt(0)}</span>
                     {/if}
-                    <span class="font-semibold">{r.title}</span>
+                    <span class="font-semibold text-gray-900">{r.title}</span>
                     {#if r.ratingCount > 0}
-                    <span class="flex items-center gap-1 text-sm text-bf-accent"><Star size={13} fill="currentColor" />{r.avgRating.toFixed(1)} <span class="text-white/40">&middot; {r.ratingCount}</span></span>
+                    <span class="flex items-center gap-1 text-sm text-bf-accent"><Star size={13} fill="currentColor" />{r.avgRating.toFixed(1)} <span class="text-gray-400">&middot; {r.ratingCount}</span></span>
                     {/if}
-                    {#if r.description}<span class="text-sm text-white/50">{r.description}</span>{/if}
-                    <span class="text-xs text-white/40">{r.capacity} pax{#if r.cost > 0} &middot; +{@html r.costFormatted}{/if}</span>
+                    {#if r.description}<span class="text-sm text-gray-500">{r.description}</span>{/if}
+                    <span class="text-xs text-gray-400">{r.capacity} pax{#if r.cost > 0} &middot; +{@html r.costFormatted}{/if}</span>
                 </button>
                 {/each}
             {/if}
@@ -863,24 +863,24 @@
         <h3 class="mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.selectTime}</h3>
         <div>
             {#if slotsLoading}
-                <div class="flex flex-col items-center justify-center gap-3 py-10 text-white/50">
+                <div class="flex flex-col items-center justify-center gap-3 py-10 text-gray-500">
                     <Loader2 size={28} class="animate-spin text-bf-accent" /><span>{i18n.loading}</span>
                 </div>
             {:else if slotsError}
-                <p class="py-6 text-center text-white/50">{slotsError}</p>
+                <p class="py-6 text-center text-gray-500">{slotsError}</p>
             {:else if !slots.length}
-                <p class="py-6 text-center text-white/50">{i18n.noSlots}</p>
+                <p class="py-6 text-center text-gray-500">{i18n.noSlots}</p>
             {:else}
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {#each slots as slot (slot.time)}
                     {@const selected = selectedSlot === slot.time}
                     <div class={slot.is_full ? 'col-span-2 sm:col-span-3' : ''}>
                     <button type="button" disabled={slot.is_full} on:click={() => selectSlot(slot)}
-                            class="w-full rounded-xl border px-4 py-3 text-center transition-all duration-150
-                                {slot.is_full ? 'border-bf-border/50 text-white/25 cursor-not-allowed' : 'hover:border-bf-accent/50 hover:-translate-y-0.5'}
-                                {selected ? 'border-bf-accent bg-bf-accent/10 shadow-md shadow-bf-accent/10' : 'border-bf-border bg-bf-bg-alt'}">
-                        <span class="block font-semibold {selected ? 'text-bf-accent' : ''}">{slot.time}</span>
-                        <span class="block text-xs text-white/45 mt-0.5">
+                            class="w-full rounded-md border px-4 py-3 text-center transition-colors duration-150
+                                {slot.is_full ? 'border-bf-border/50 text-gray-300 cursor-not-allowed' : 'hover:border-bf-accent/50'}
+                                {selected ? 'border-bf-accent bg-bf-accent/10' : 'border-bf-border bg-bf-bg-alt'}">
+                        <span class="block font-semibold {slot.is_full ? 'text-gray-300' : selected ? 'text-bf-accent' : 'text-gray-900'}">{slot.time}</span>
+                        <span class="block text-xs text-gray-400 mt-0.5">
                             {slot.is_full ? (i18n.soldOut || 'Sold out') : (i18n.spotsOfMax || '%d of %d available').replace('%d', slot.available).replace('%d', slot.max_persons)}
                         </span>
                     </button>
@@ -893,21 +893,21 @@
                             {i18n.notifyMe}
                         </button>
                         {#if waitlistOpenFor === slot.time}
-                        <div class="mt-2 space-y-2 rounded-xl border border-bf-border bg-bf-bg-alt p-3">
+                        <div class="mt-2 space-y-2 rounded-md border border-bf-border bg-bf-bg-alt p-3">
                             <div style="position:absolute;left:-9999px;" aria-hidden="true">
                                 <input type="text" tabindex="-1" autocomplete="off" bind:value={waitlistHoneypot}>
                             </div>
                             <input type="text" placeholder={i18n.waitlistNameLabel} bind:value={waitlistName}
-                                   class="w-full rounded-lg border border-bf-border bg-bf-bg px-3 py-2 text-sm text-white placeholder:text-white/30">
+                                   class="w-full rounded-md border border-bf-border bg-bf-bg px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400">
                             <input type="email" placeholder={i18n.waitlistEmailLabel} bind:value={waitlistEmail}
-                                   class="w-full rounded-lg border border-bf-border bg-bf-bg px-3 py-2 text-sm text-white placeholder:text-white/30">
+                                   class="w-full rounded-md border border-bf-border bg-bf-bg px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400">
                             <input type="tel" placeholder={i18n.waitlistPhoneLabel} bind:value={waitlistPhone}
-                                   class="w-full rounded-lg border border-bf-border bg-bf-bg px-3 py-2 text-sm text-white placeholder:text-white/30">
+                                   class="w-full rounded-md border border-bf-border bg-bf-bg px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400">
                             {#if waitlistError}<p class="text-xs text-red-400">{waitlistError}</p>{/if}
                             <button type="button" disabled={waitlistSubmitting || !waitlistName.trim() || !waitlistEmail.trim()}
                                     on:click={() => submitWaitlist(slot)}
-                                    class="w-full rounded-lg bg-bf-accent px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-bf-accent-dark disabled:opacity-40">
-                                {i18n.waitlistSubmit}
+                                    class="w-full rounded-md bg-bf-accent px-3 py-2 text-sm font-semibold transition-colors hover:bg-bf-accent-dark disabled:opacity-40">
+                                <span class="text-white">{i18n.waitlistSubmit}</span>
                             </button>
                         </div>
                         {/if}
@@ -927,25 +927,25 @@
         <h3 class="mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.participants}</h3>
         <div class="flex flex-col gap-3">
             {#each (cfg.personTypes || []) as pt, i (pt.id)}
-            <div class="flex items-center justify-between rounded-xl border border-bf-border bg-bf-bg-alt px-5 py-4">
+            <div class="flex items-center justify-between rounded-md border border-bf-border bg-bf-bg-alt px-4 py-3.5">
                 <div>
                     <div class="font-semibold">{pt.name}</div>
                     <div class="text-sm text-bf-accent">{@html pt.costFormatted}</div>
                 </div>
-                <div class="flex items-center gap-3 rounded-full border border-bf-border bg-bf-bg px-1.5 py-1.5">
-                    <button type="button" on:click={() => changePersonType(i, -1)} class="flex h-8 w-8 items-center justify-center rounded-full bg-transparent transition-colors hover:bg-bf-accent/20"><Minus size={15} /></button>
-                    <span class="w-6 text-center font-semibold">{personTypeQtys[i]}</span>
-                    <button type="button" on:click={() => changePersonType(i, 1)} class="flex h-8 w-8 items-center justify-center rounded-full bg-transparent transition-colors hover:bg-bf-accent/20"><Plus size={15} /></button>
+                <div class="inline-flex items-stretch rounded-md border border-bf-border bg-bf-bg overflow-hidden">
+                    <button type="button" on:click={() => changePersonType(i, -1)} class="flex h-8 w-8 items-center justify-center border-0 bg-transparent p-0 appearance-none transition-colors hover:bg-bf-accent/10"><Minus size={14} class="text-gray-700" /></button>
+                    <span class="flex w-8 items-center justify-center border-x border-bf-border text-sm font-semibold">{personTypeQtys[i]}</span>
+                    <button type="button" on:click={() => changePersonType(i, 1)} class="flex h-8 w-8 items-center justify-center border-0 bg-transparent p-0 appearance-none transition-colors hover:bg-bf-accent/10"><Plus size={14} class="text-gray-700" /></button>
                 </div>
             </div>
             {/each}
         </div>
         {:else}
         <h3 class="mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.numberOfPersons}</h3>
-        <div class="flex items-center gap-5 rounded-full border border-bf-border bg-bf-bg-alt w-fit px-2 py-2">
-            <button type="button" on:click={() => setPersons(persons - 1)} class="flex h-10 w-10 items-center justify-center rounded-full bg-transparent transition-colors hover:bg-bf-accent/20"><Minus size={16} /></button>
-            <span class="w-8 text-center text-lg font-semibold">{persons}</span>
-            <button type="button" on:click={() => setPersons(persons + 1)} class="flex h-10 w-10 items-center justify-center rounded-full bg-transparent transition-colors hover:bg-bf-accent/20"><Plus size={16} /></button>
+        <div class="inline-flex items-stretch rounded-md border border-bf-border bg-bf-bg overflow-hidden">
+            <button type="button" on:click={() => setPersons(persons - 1)} class="flex h-10 w-10 items-center justify-center border-0 bg-transparent p-0 appearance-none transition-colors hover:bg-bf-accent/10"><Minus size={16} class="text-gray-700" /></button>
+            <span class="flex w-10 items-center justify-center border-x border-bf-border text-base font-semibold">{persons}</span>
+            <button type="button" on:click={() => setPersons(persons + 1)} class="flex h-10 w-10 items-center justify-center border-0 bg-transparent p-0 appearance-none transition-colors hover:bg-bf-accent/10"><Plus size={16} class="text-gray-700" /></button>
         </div>
         {/if}
         {#if spotsRemainingText}
@@ -959,27 +959,27 @@
         <h3 class="mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.contactDetails}</h3>
         <div class="flex flex-col gap-4 max-w-lg">
             <div>
-                <label for="bookflow-customer-name" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/50">{i18n.fullName}</label>
+                <label for="bookflow-customer-name" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">{i18n.fullName}</label>
                 <input type="text" id="bookflow-customer-name" required
                        bind:value={customerName}
                        on:blur={() => { touched.name = true; maybeSavePartial(); }}
-                       class="w-full rounded-xl border bg-bf-bg-alt px-4 py-3 text-white outline-none transition-colors placeholder:text-white/30 focus:ring-2 focus:ring-bf-accent/20
+                       class="w-full rounded-md border bg-bf-bg-alt px-4 py-2.5 text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:ring-1 focus:ring-bf-accent/30
                            {touched.name && fieldState('name', customerName) === 'invalid' ? 'border-red-500/70' : fieldState('name', customerName) === 'valid' ? 'border-emerald-500/60' : 'border-bf-border focus:border-bf-accent'}">
                 {#if touched.name && fieldError('name', customerName)}<p class="mt-1 text-xs text-red-400">{fieldError('name', customerName)}</p>{/if}
             </div>
             <div>
-                <label for="bookflow-customer-phone" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/50">{i18n.phone}</label>
+                <label for="bookflow-customer-phone" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">{i18n.phone}</label>
                 <input type="tel" id="bookflow-customer-phone" required
                        bind:value={customerPhone}
                        on:blur={() => { touched.phone = true; maybeSavePartial(); }}
-                       class="w-full rounded-xl border bg-bf-bg-alt px-4 py-3 text-white outline-none transition-colors placeholder:text-white/30 focus:ring-2 focus:ring-bf-accent/20
+                       class="w-full rounded-md border bg-bf-bg-alt px-4 py-2.5 text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:ring-1 focus:ring-bf-accent/30
                            {touched.phone && fieldState('phone', customerPhone) === 'invalid' ? 'border-red-500/70' : fieldState('phone', customerPhone) === 'valid' ? 'border-emerald-500/60' : 'border-bf-border focus:border-bf-accent'}">
                 {#if touched.phone && fieldError('phone', customerPhone)}<p class="mt-1 text-xs text-red-400">{fieldError('phone', customerPhone)}</p>{/if}
             </div>
             <div>
-                <label for="bookflow-notes" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/50">{i18n.notesOptional}</label>
+                <label for="bookflow-notes" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">{i18n.notesOptional}</label>
                 <textarea id="bookflow-notes" rows="3" bind:value={notes}
-                          class="w-full rounded-xl border border-bf-border bg-bf-bg-alt px-4 py-3 text-white outline-none transition-colors placeholder:text-white/30 focus:border-bf-accent focus:ring-2 focus:ring-bf-accent/20"></textarea>
+                          class="w-full rounded-md border border-bf-border bg-bf-bg-alt px-4 py-2.5 text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-bf-accent focus:ring-1 focus:ring-bf-accent/30"></textarea>
             </div>
         </div>
     </div>
@@ -987,12 +987,12 @@
 
     {#if currentStep === 'confirm'}
     <div>
-        <div class="rounded-2xl border border-bf-border bg-bf-bg-alt overflow-hidden">
+        <div class="rounded-lg border border-bf-border bg-bf-bg-alt overflow-hidden">
             <h3 class="px-5 pt-4 pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.bookingDetails}</h3>
             <div class="divide-y divide-bf-border">
                 {#each recapRows as row}
                 <div class="flex items-center justify-between px-5 py-3">
-                    <span class="text-white/50">{row[0]}</span>
+                    <span class="text-gray-500">{row[0]}</span>
                     <span class="font-semibold text-right">{row[1]}</span>
                 </div>
                 {/each}
@@ -1004,7 +1004,7 @@
             <h3 class="mb-4 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.extrasTitle}</h3>
             <div class="flex flex-col gap-3">
                 {#each cfg.extras as ex (ex.id)}
-                <div class="flex items-center justify-between rounded-xl border border-bf-border bg-bf-bg-alt px-5 py-3.5">
+                <div class="flex items-center justify-between rounded-md border border-bf-border bg-bf-bg-alt px-4 py-3">
                     <div>
                         <div class="font-medium">{ex.title}</div>
                         <div class="text-sm text-bf-accent">{@html ex.priceFormatted}</div>
@@ -1012,7 +1012,7 @@
                     <Switch.Root
                         checked={!!extrasChecked[ex.id]}
                         onCheckedChange={(v) => { extrasChecked = { ...extrasChecked, [ex.id]: v }; updatePrice(); }}
-                        class="relative h-6 w-11 shrink-0 rounded-full bg-white/10 transition-colors data-[state=checked]:bg-bf-accent"
+                        class="relative h-6 w-11 shrink-0 rounded-full bg-gray-300 transition-colors data-[state=checked]:bg-bf-accent"
                     >
                         <Switch.Thumb class="block h-5 w-5 translate-x-0.5 rounded-full bg-white shadow transition-transform duration-200 data-[state=checked]:translate-x-[22px]" />
                     </Switch.Root>
@@ -1022,12 +1022,12 @@
         </div>
         {/if}
 
-        <div class="mt-6 rounded-2xl border border-bf-border bg-bf-bg-alt p-5">
-            <div class="flex items-center justify-between py-1.5 text-sm text-white/60">
+        <div class="mt-6 rounded-lg border border-bf-border bg-bf-bg-alt p-5">
+            <div class="flex items-center justify-between py-1.5 text-sm text-gray-500">
                 <span>{i18n.pricePerPerson}</span>
                 <span>{@html priceData ? priceData.price_per_person_formatted : '-'}</span>
             </div>
-            <div class="flex items-center justify-between py-1.5 text-sm text-white/60">
+            <div class="flex items-center justify-between py-1.5 text-sm text-gray-500">
                 <span>{i18n.persons}</span>
                 <span>{priceData ? priceData.persons : '-'}</span>
             </div>
@@ -1036,11 +1036,11 @@
                 <span class="text-bf-accent">{@html priceData ? priceData.total_formatted : '-'}</span>
             </div>
             {#if priceData && priceData.deposit_amount_formatted}
-            <div class="mt-3 flex items-center justify-between border-t border-bf-border pt-3 text-sm text-white/60">
+            <div class="mt-3 flex items-center justify-between border-t border-bf-border pt-3 text-sm text-gray-500">
                 <span>{i18n.depositPaidNow}</span>
                 <span>{@html priceData.deposit_amount_formatted}</span>
             </div>
-            <div class="flex items-center justify-between py-1 text-sm text-white/60">
+            <div class="flex items-center justify-between py-1 text-sm text-gray-500">
                 <span>{i18n.balanceDue}</span>
                 <span>{@html priceData.balance_due_formatted}</span>
             </div>
@@ -1049,7 +1049,7 @@
 
         {#if hasTerms}
         <div class="mt-6">
-            <p class="mb-3 rounded-xl border border-bf-border bg-bf-bg-alt p-4 text-sm text-white/55">{cfg.termsText}</p>
+            <p class="mb-3 rounded-md border border-bf-border bg-bf-bg-alt p-4 text-sm text-gray-600">{cfg.termsText}</p>
             <label class="flex cursor-pointer items-center gap-3">
                 <Checkbox.Root
                     checked={termsAccepted}
@@ -1058,14 +1058,14 @@
                 >
                     <Check size={13} strokeWidth={3.5} class="text-white opacity-0 transition-opacity group-data-[state=checked]:opacity-100" />
                 </Checkbox.Root>
-                <span class="text-sm text-white/90">{i18n.termsAgree}</span>
+                <span class="text-sm text-gray-800">{i18n.termsAgree}</span>
             </label>
         </div>
         {/if}
 
         {#if hasGdpr}
         <div class="mt-4">
-            <p class="mb-3 rounded-xl border border-bf-border bg-bf-bg-alt p-4 text-sm text-white/55">{cfg.gdprText}</p>
+            <p class="mb-3 rounded-md border border-bf-border bg-bf-bg-alt p-4 text-sm text-gray-600">{cfg.gdprText}</p>
             <label class="flex cursor-pointer items-center gap-3">
                 <Checkbox.Root
                     checked={gdprAccepted}
@@ -1074,7 +1074,7 @@
                 >
                     <Check size={13} strokeWidth={3.5} class="text-white opacity-0 transition-opacity group-data-[state=checked]:opacity-100" />
                 </Checkbox.Root>
-                <span class="text-sm text-white/90">{i18n.gdprAgree}</span>
+                <span class="text-sm text-gray-800">{i18n.gdprAgree}</span>
             </label>
         </div>
         {/if}
@@ -1086,22 +1086,22 @@
 
     <div class="mt-8 flex items-center justify-between">
         <button type="button" on:click={prevStep} style:visibility={isFirstStep ? 'hidden' : 'visible'}
-                class="rounded-full border border-bf-border bg-transparent px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white/70 transition-all hover:border-white/40 hover:text-white">
-            {i18n.wizardBack}
+                class="rounded-md border border-bf-border bg-transparent px-5 py-2.5 text-sm font-semibold uppercase tracking-wide transition-colors hover:border-gray-400">
+            <span class="text-gray-600">{i18n.wizardBack}</span>
         </button>
         {#if !isLastStep}
         <button type="button" disabled={!currentStepComplete} on:click={() => { if (currentStepComplete) nextStep(); }}
-                class="rounded-full bg-gradient-to-r from-bf-accent to-bf-accent-dark px-7 py-3 text-sm font-semibold uppercase tracking-wide text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-bf-accent/20 disabled:pointer-events-none disabled:translate-y-0 disabled:opacity-40">
-            {i18n.wizardNext}
+                class="rounded-md bg-bf-accent px-6 py-2.5 text-sm font-semibold uppercase tracking-wide transition-colors duration-150 hover:bg-bf-accent-dark disabled:pointer-events-none disabled:opacity-40">
+            <span class="text-white">{i18n.wizardNext}</span>
         </button>
         {/if}
         {#if isLastStep}
         <div id="bookflow-final-nav">
             <input type="hidden" name="add-to-cart" value={cfg.productId}>
             <button type="submit" id="bookflow-submit" name="add-to-cart" value={cfg.productId} disabled={!formReady || submitLoading}
-                    class="flex items-center gap-2 rounded-full bg-gradient-to-r from-bf-accent to-bf-accent-dark px-7 py-3 text-sm font-semibold uppercase tracking-wide text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-bf-accent/20 disabled:pointer-events-none disabled:translate-y-0 disabled:opacity-40">
-                {#if submitLoading}<Loader2 size={16} class="animate-spin" />{/if}
-                {cfg.addToCartText || i18n.wizardNext}
+                    class="flex items-center gap-2 rounded-md bg-bf-accent px-6 py-2.5 text-sm font-semibold uppercase tracking-wide transition-colors duration-150 hover:bg-bf-accent-dark disabled:pointer-events-none disabled:opacity-40">
+                {#if submitLoading}<Loader2 size={16} class="animate-spin text-white" />{/if}
+                <span class="text-white">{cfg.addToCartText || i18n.wizardNext}</span>
             </button>
         </div>
         {/if}

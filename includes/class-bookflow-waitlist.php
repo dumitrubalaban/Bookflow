@@ -76,7 +76,7 @@ class Bookflow_Waitlist {
     public static function create($data) {
         global $wpdb;
 
-        $inserted = $wpdb->insert($wpdb->prefix . 'bookflow_waitlist', [
+        $inserted = $wpdb->insert($wpdb->prefix . 'bookflow_waitlist', [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             'product_id'        => absint($data['product_id']),
             'resource_id'       => $data['resource_id'] ?? null,
             'schedule_id'       => $data['schedule_id'] ?? null,
@@ -118,7 +118,7 @@ class Bookflow_Waitlist {
         }
 
         $sql = "SELECT * FROM $table WHERE " . implode(' AND ', $where) . ' ORDER BY created_at ASC';
-        return $wpdb->get_results($wpdb->prepare($sql, ...$values));
+        return $wpdb->get_results($wpdb->prepare($sql, ...$values)); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- built only from fixed literals + %d/%s placeholders; real values always passed through $wpdb->prepare()
     }
 
     /**
@@ -172,7 +172,7 @@ class Bookflow_Waitlist {
 
         wp_mail($entry->customer_email, $subject, $body, ['Content-Type: text/html; charset=UTF-8']);
 
-        $wpdb->update(
+        $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             $wpdb->prefix . 'bookflow_waitlist',
             ['status' => 'notified', 'notified_at' => current_time('mysql')],
             ['id' => $entry->id]

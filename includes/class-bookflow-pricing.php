@@ -58,7 +58,7 @@ class Bookflow_Pricing {
     private static function apply_rules($product_id, $base_price, $date, $start_time) {
         global $wpdb;
 
-        $rules = $wpdb->get_results($wpdb->prepare(
+        $rules = $wpdb->get_results($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT * FROM {$wpdb->prefix}bookflow_pricing_rules
              WHERE product_id = %d
              ORDER BY priority DESC, sort_order ASC",
@@ -160,7 +160,7 @@ class Bookflow_Pricing {
         // Add resource cost
         if ($resource_id) {
             global $wpdb;
-            $resource_cost = $wpdb->get_var($wpdb->prepare(
+            $resource_cost = $wpdb->get_var($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
                 "SELECT base_cost FROM {$wpdb->prefix}bookflow_product_resources WHERE product_id = %d AND resource_id = %d",
                 $product_id,
                 $resource_id
@@ -208,7 +208,7 @@ class Bookflow_Pricing {
 
         // DB pricing rules (fixed only)
         global $wpdb;
-        $fixed_rules = $wpdb->get_col($wpdb->prepare(
+        $fixed_rules = $wpdb->get_col($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT modifier_amount FROM {$wpdb->prefix}bookflow_pricing_rules WHERE product_id = %d AND modifier_type = 'fixed' AND modifier_amount > 0",
             $product_id
         ));

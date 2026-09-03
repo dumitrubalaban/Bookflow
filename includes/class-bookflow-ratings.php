@@ -176,7 +176,7 @@ class Bookflow_Ratings {
 
     private function get_existing_rating($booking_id) {
         global $wpdb;
-        return $wpdb->get_row($wpdb->prepare(
+        return $wpdb->get_row($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT * FROM {$wpdb->prefix}bookflow_resource_ratings WHERE booking_id = %d",
             absint($booking_id)
         ));
@@ -208,7 +208,7 @@ class Bookflow_Ratings {
         }
 
         global $wpdb;
-        $wpdb->insert($wpdb->prefix . 'bookflow_resource_ratings', [
+        $wpdb->insert($wpdb->prefix . 'bookflow_resource_ratings', [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             'resource_id' => absint($booking->resource_id),
             'booking_id'  => $booking_id,
             'rating'      => $rating,
@@ -222,11 +222,11 @@ class Bookflow_Ratings {
 
     private function recompute_resource_stats($resource_id) {
         global $wpdb;
-        $row = $wpdb->get_row($wpdb->prepare(
+        $row = $wpdb->get_row($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT AVG(rating) as avg_rating, COUNT(*) as rating_count FROM {$wpdb->prefix}bookflow_resource_ratings WHERE resource_id = %d",
             absint($resource_id)
         ));
-        $wpdb->update($wpdb->prefix . 'bookflow_resources', [
+        $wpdb->update($wpdb->prefix . 'bookflow_resources', [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             'avg_rating'   => round((float) $row->avg_rating, 2),
             'rating_count' => (int) $row->rating_count,
         ], ['id' => absint($resource_id)]);

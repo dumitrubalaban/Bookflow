@@ -121,7 +121,7 @@ class Bookflow_Availability {
     private static function check_availability_rules($product_id, $date, $resource_id = null) {
         global $wpdb;
 
-        $rules = $wpdb->get_results($wpdb->prepare(
+        $rules = $wpdb->get_results($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT * FROM {$wpdb->prefix}bookflow_availability_rules
              WHERE product_id = %d AND (resource_id IS NULL OR resource_id = %d)
              ORDER BY priority DESC, sort_order ASC",
@@ -305,7 +305,7 @@ class Bookflow_Availability {
     private static function check_time_availability_rules($product_id, $date, $start_time, $resource_id = null) {
         global $wpdb;
 
-        $rules = $wpdb->get_results($wpdb->prepare(
+        $rules = $wpdb->get_results($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT * FROM {$wpdb->prefix}bookflow_availability_rules
              WHERE product_id = %d AND rule_type = 'time_range'
              AND (resource_id IS NULL OR resource_id = %d)

@@ -40,7 +40,7 @@ class Bookflow_iCal {
         // screen id for both, since WP's screen id doesn't vary with the
         // `view` query arg) — the subscribe link is about every booking,
         // so it reads as out of place pinned above one specific booking.
-        if (!empty($_GET['view'])) {
+        if (!empty($_GET['view'])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only view-mode switch, no state change
             return;
         }
         $url = self::feed_url();
@@ -116,6 +116,7 @@ class Bookflow_iCal {
         global $wpdb;
         $table = $wpdb->prefix . 'bookflow_bookings';
         // Everything from 30 days ago onwards, excluding cancelled/refunded
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- custom table, no core API exists; live data required for booking/availability integrity; $table is built only from $wpdb->prefix + a fixed literal string, never from user input
         $rows = $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM $table
              WHERE booking_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
@@ -123,6 +124,7 @@ class Bookflow_iCal {
              ORDER BY booking_date ASC, start_time ASC
              LIMIT 1000"
         ));
+        // phpcs:enable
 
         $events = '';
         foreach ($rows as $b) {

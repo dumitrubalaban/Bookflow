@@ -42,7 +42,7 @@ class Bookflow_Resources {
 
     public static function create($data) {
         global $wpdb;
-        $wpdb->insert($wpdb->prefix . 'bookflow_resources', [
+        $wpdb->insert($wpdb->prefix . 'bookflow_resources', [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             'title'       => sanitize_text_field($data['title']),
             'description' => sanitize_textarea_field($data['description'] ?? ''),
             'capacity'    => absint($data['capacity'] ?? 0),
@@ -55,7 +55,7 @@ class Bookflow_Resources {
 
     public static function get($id) {
         global $wpdb;
-        return $wpdb->get_row($wpdb->prepare(
+        return $wpdb->get_row($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT * FROM {$wpdb->prefix}bookflow_resources WHERE id = %d",
             absint($id)
         ));
@@ -102,12 +102,15 @@ class Bookflow_Resources {
 
     public static function get_all($status = null) {
         global $wpdb;
+        // $sql is only ever extended with fixed literal fragments — the
+        // one dynamic value ($status) already went through %s + prepare()
+        // above before the literal ORDER BY is appended.
         $sql = "SELECT * FROM {$wpdb->prefix}bookflow_resources";
         if ($status) {
-            $sql = $wpdb->prepare($sql . " WHERE status = %s", $status);
+            $sql = $wpdb->prepare($sql . " WHERE status = %s", $status); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
         }
         $sql .= " ORDER BY sort_order ASC, title ASC";
-        return $wpdb->get_results($sql);
+        return $wpdb->get_results($sql); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- $sql is either the fixed base query or that query with $status already substituted via prepare() above
     }
 
     public static function update($id, $data) {
@@ -120,20 +123,20 @@ class Bookflow_Resources {
         if (isset($data['status']))      $update['status'] = sanitize_text_field($data['status']);
         if (isset($data['meta']))        $update['meta'] = wp_json_encode($data['meta']);
 
-        return $wpdb->update($wpdb->prefix . 'bookflow_resources', $update, ['id' => absint($id)]);
+        return $wpdb->update($wpdb->prefix . 'bookflow_resources', $update, ['id' => absint($id)]); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
     }
 
     public static function delete($id) {
         global $wpdb;
-        $wpdb->delete($wpdb->prefix . 'bookflow_product_resources', ['resource_id' => absint($id)], ['%d']);
-        return $wpdb->delete($wpdb->prefix . 'bookflow_resources', ['id' => absint($id)], ['%d']);
+        $wpdb->delete($wpdb->prefix . 'bookflow_product_resources', ['resource_id' => absint($id)], ['%d']); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
+        return $wpdb->delete($wpdb->prefix . 'bookflow_resources', ['id' => absint($id)], ['%d']); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
     }
 
     // --- Product-Resource assignments ---
 
     public static function assign_to_product($product_id, $resource_id, $base_cost = 0) {
         global $wpdb;
-        $wpdb->replace($wpdb->prefix . 'bookflow_product_resources', [
+        $wpdb->replace($wpdb->prefix . 'bookflow_product_resources', [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             'product_id'  => absint($product_id),
             'resource_id' => absint($resource_id),
             'base_cost'   => (float) $base_cost,
@@ -142,7 +145,7 @@ class Bookflow_Resources {
 
     public static function unassign_from_product($product_id, $resource_id) {
         global $wpdb;
-        $wpdb->delete($wpdb->prefix . 'bookflow_product_resources', [
+        $wpdb->delete($wpdb->prefix . 'bookflow_product_resources', [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             'product_id'  => absint($product_id),
             'resource_id' => absint($resource_id),
         ], ['%d', '%d']);
@@ -150,7 +153,7 @@ class Bookflow_Resources {
 
     public static function get_for_product($product_id) {
         global $wpdb;
-        return $wpdb->get_results($wpdb->prepare(
+        return $wpdb->get_results($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT r.*, pr.base_cost
              FROM {$wpdb->prefix}bookflow_resources r
              INNER JOIN {$wpdb->prefix}bookflow_product_resources pr ON r.id = pr.resource_id
@@ -302,11 +305,11 @@ class Bookflow_Resources {
 
         $id = absint($_POST['id'] ?? 0);
         $data = [
-            'title'       => sanitize_text_field($_POST['title'] ?? ''),
-            'description' => sanitize_textarea_field($_POST['description'] ?? ''),
+            'title'       => sanitize_text_field(wp_unslash($_POST['title'] ?? '')),
+            'description' => sanitize_textarea_field(wp_unslash($_POST['description'] ?? '')),
             'capacity'    => absint($_POST['capacity'] ?? 0),
             'sort_order'  => absint($_POST['sort_order'] ?? 0),
-            'status'      => sanitize_text_field($_POST['status'] ?? 'active'),
+            'status'      => sanitize_text_field(wp_unslash($_POST['status'] ?? 'active')),
         ];
         if (isset($_POST['photo_id']) || isset($_POST['gallery_ids'])) {
             // gallery_ids (the portfolio picker) isn't sent by every caller
@@ -317,7 +320,7 @@ class Bookflow_Resources {
             $data['meta'] = [
                 'photo_id'    => absint($_POST['photo_id'] ?? 0),
                 'gallery_ids' => isset($_POST['gallery_ids'])
-                    ? self::parse_gallery_ids($_POST['gallery_ids'])
+                    ? self::parse_gallery_ids(wp_unslash($_POST['gallery_ids'])) // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized inside parse_gallery_ids() (absint on every element)
                     : (array) ($existing_meta['gallery_ids'] ?? []),
             ];
         }

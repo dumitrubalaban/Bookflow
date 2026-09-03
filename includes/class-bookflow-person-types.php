@@ -21,7 +21,7 @@ class Bookflow_Person_Types {
      */
     public static function get_for_product($product_id) {
         global $wpdb;
-        return $wpdb->get_results($wpdb->prepare(
+        return $wpdb->get_results($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT * FROM {$wpdb->prefix}bookflow_person_types WHERE product_id = %d ORDER BY sort_order ASC",
             absint($product_id)
         ));
@@ -32,7 +32,7 @@ class Bookflow_Person_Types {
      */
     public static function get($id) {
         global $wpdb;
-        return $wpdb->get_row($wpdb->prepare(
+        return $wpdb->get_row($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT * FROM {$wpdb->prefix}bookflow_person_types WHERE id = %d",
             absint($id)
         ));
@@ -65,10 +65,10 @@ class Bookflow_Person_Types {
             ];
 
             if (!empty($type['id']) && in_array($type['id'], $existing)) {
-                $wpdb->update($table, $data, ['id' => absint($type['id'])]);
+                $wpdb->update($table, $data, ['id' => absint($type['id'])]); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
                 $updated_ids[] = (int) $type['id'];
             } else {
-                $wpdb->insert($table, $data);
+                $wpdb->insert($table, $data); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
                 $updated_ids[] = $wpdb->insert_id;
             }
         }
@@ -76,7 +76,7 @@ class Bookflow_Person_Types {
         // Delete removed types
         $to_delete = array_diff($existing, $updated_ids);
         foreach ($to_delete as $del_id) {
-            $wpdb->delete($table, ['id' => absint($del_id)], ['%d']);
+            $wpdb->delete($table, ['id' => absint($del_id)], ['%d']); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
         }
     }
 
@@ -217,7 +217,7 @@ class Bookflow_Person_Types {
         update_post_meta($product_id, '_bookflow_enable_person_types', $enabled);
 
         if ($enabled === 'yes' && !empty($_POST['bookflow_person_types']) && is_array($_POST['bookflow_person_types'])) {
-            self::save_for_product($product_id, wp_unslash($_POST['bookflow_person_types']));
+            self::save_for_product($product_id, wp_unslash($_POST['bookflow_person_types'])); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- each field is sanitized in save_for_product() (sanitize_text_field()/absint()/float cast) before use
         }
     }
 }

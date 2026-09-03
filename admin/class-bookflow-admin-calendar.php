@@ -20,7 +20,7 @@ class Bookflow_Admin_Calendar {
         add_submenu_page(
             'bookflow-bookings',
             Bookflow_I18n::t('admin.booking_calendar'),
-            Bookflow_I18n::t('admin.booking_calendar'),
+            Bookflow_I18n::t('admin.calendar'),
             'manage_woocommerce',
             'bookflow-calendar',
             [$this, 'render_page']

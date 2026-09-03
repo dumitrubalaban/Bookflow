@@ -19,14 +19,17 @@
 }
 
 @theme {
-    /* Deep navy + steel-blue — the *customer-facing widget's* default look
-       (Widget Builder will make this configurable per-widget; these stay
-       as the fallback for a widget with no saved style). */
-    --color-bf-accent: #5b8fc7;
-    --color-bf-accent-dark: #3f6c9e;
-    --color-bf-bg: #10151f;
-    --color-bf-bg-alt: #1a2233;
-    --color-bf-border: #2a3448;
+    /* Plain wp-admin-style light theme — the *customer-facing widget's*
+       default look (Widget Builder will make this configurable per-widget;
+       these stay as the fallback for a widget with no saved style). Same
+       hex values wp-admin itself uses for its card background, borders,
+       and primary button/link blue, so the widget doesn't clash with a
+       theme's own styling the way a dark, colorful skin would. */
+    --color-bf-accent: #2271b1;
+    --color-bf-accent-dark: #135e96;
+    --color-bf-bg: #ffffff;
+    --color-bf-bg-alt: #f6f7f7;
+    --color-bf-border: #dcdcde;
 
     /* Admin screens intentionally do NOT reuse the widget's theme — they
        stay plain WordPress admin (white panels, WP's own blue) so the

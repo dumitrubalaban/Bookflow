@@ -612,7 +612,7 @@ class Bookflow_Google_Calendar {
             return;
         }
 
-        $notice = isset($_GET['bookflow_gcal_notice']) ? sanitize_text_field(wp_unslash($_GET['bookflow_gcal_notice'])) : '';
+        $notice = isset($_GET['bookflow_gcal_notice']) ? sanitize_text_field(wp_unslash($_GET['bookflow_gcal_notice'])) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only display notice, no state change
         ?>
         <div class="wrap">
             <h1>Google Calendar</h1>

@@ -95,9 +95,9 @@ class Bookflow_Export {
             'order'   => 'ASC',
         ];
 
-        if (!empty($_POST['date_from'])) $args['date_from'] = sanitize_text_field($_POST['date_from']);
-        if (!empty($_POST['date_to']))   $args['date_to']   = sanitize_text_field($_POST['date_to']);
-        if (!empty($_POST['status']))     $args['status']     = sanitize_text_field($_POST['status']);
+        if (!empty($_POST['date_from'])) $args['date_from'] = sanitize_text_field(wp_unslash($_POST['date_from']));
+        if (!empty($_POST['date_to']))   $args['date_to']   = sanitize_text_field(wp_unslash($_POST['date_to']));
+        if (!empty($_POST['status']))     $args['status']     = sanitize_text_field(wp_unslash($_POST['status']));
         if (!empty($_POST['product_id'])) $args['product_id'] = absint($_POST['product_id']);
 
         $bookings = Bookflow_Booking::query($args);
@@ -109,9 +109,14 @@ class Bookflow_Export {
         header('Pragma: no-cache');
         header('Expires: 0');
 
+        // WP_Filesystem has no equivalent for streaming directly to the
+        // active HTTP response — it operates on real files on disk, not
+        // the php://output stream a CSV download needs to write to.
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
         $output = fopen('php://output', 'w');
 
         // BOM for Excel UTF-8
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
         fwrite($output, "\xEF\xBB\xBF");
 
         // Header row
@@ -147,6 +152,7 @@ class Bookflow_Export {
             ]);
         }
 
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
         fclose($output);
         exit;
     }

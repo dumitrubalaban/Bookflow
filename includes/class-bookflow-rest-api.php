@@ -310,7 +310,7 @@ class Bookflow_REST_API {
 
             if ($resource_id) {
                 global $wpdb;
-                $res = $wpdb->get_row($wpdb->prepare("SELECT capacity FROM {$wpdb->prefix}bookflow_resources WHERE id = %d AND status = 'active'", $resource_id));
+                $res = $wpdb->get_row($wpdb->prepare("SELECT capacity FROM {$wpdb->prefix}bookflow_resources WHERE id = %d AND status = 'active'", $resource_id)); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
                 if ($res && (int) $res->capacity > 0 && ($others + $new_persons) > (int) $res->capacity) {
                     return new WP_Error('resource_capacity_exceeded', Bookflow_I18n::t('error.not_enough_capacity', max(0, (int) $res->capacity - $others)), ['status' => 409]);
                 }
@@ -526,7 +526,7 @@ class Bookflow_REST_API {
 
         $location_id = absint($request->get_param('location_id'));
         if ($location_id) {
-            $args['meta_query'] = [[
+            $args['meta_query'] = [[ // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- filtering products by assigned location is the whole point of this endpoint; wc_get_products() has no non-meta_query way to filter by a custom product meta key
                 'key'   => '_bookflow_location_id',
                 'value' => $location_id,
             ]];
@@ -739,7 +739,7 @@ class Bookflow_REST_API {
 
         // Same hook a normal checkout fires — this is what actually turns
         // the order line into a Bookflow_Booking row via Bookflow_Cart.
-        do_action('woocommerce_checkout_order_processed', $order->get_id(), [], $order);
+        do_action('woocommerce_checkout_order_processed', $order->get_id(), [], $order); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own hook name, not this plugin's; firing it is how this endpoint reuses WooCommerce/Bookflow_Cart's normal order-processed handling
 
         $bookings = Bookflow_Booking::query(['order_id' => $order->get_id(), 'limit' => 1]);
         $booking = $bookings[0] ?? null;

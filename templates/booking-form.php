@@ -10,6 +10,10 @@ if (!defined('ABSPATH')) {
 }
 
 global $product;
+// This is a template include (see Bookflow_Frontend::add_to_cart_template()),
+// not a top-level script — these are template-local working variables, not
+// real WordPress globals, so they don't need the plugin prefix.
+// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 $product_id     = $product->get_id();
 $min_persons    = $product->get_min_persons();
 $max_persons    = $product->get_max_persons();
@@ -18,6 +22,7 @@ $person_types   = $has_person_types ? Bookflow_Person_Types::get_for_product($pr
 $has_resources  = $product->has_resources();
 $terms_text     = get_post_meta($product_id, '_bookflow_terms_text', true);
 $extras         = Bookflow_Extras::get_all('active');
+// phpcs:enable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 
 // The Svelte build (svelte-src/, `npm run build`) owns the entire wizard
 // once it exists — it renders into this single mount point instead of the
@@ -93,7 +98,7 @@ if (file_exists(BOOKFLOW_PLUGIN_DIR . 'public/dist/bookflow-widget.js')) {
         <?php if ($has_person_types) : ?>
         <h3 class="bookflow-section-title"><?php Bookflow_I18n::te('form.participants'); ?></h3>
         <div class="bookflow-person-types" id="bookflow-person-types-section">
-            <?php foreach ($person_types as $i => $pt) : ?>
+            <?php foreach ($person_types as $i => $pt) : // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- local loop variables, not globals ?>
             <div class="bookflow-person-type-row" data-type-id="<?php echo esc_attr($pt->id); ?>">
                 <div class="bookflow-person-type-info">
                     <span class="bookflow-person-type-name"><?php echo esc_html($pt->name); ?></span>
@@ -161,7 +166,7 @@ if (file_exists(BOOKFLOW_PLUGIN_DIR . 'public/dist/bookflow-widget.js')) {
         <div class="bookflow-extras-block" id="bookflow-extras-block">
             <h3 class="bookflow-section-title"><?php Bookflow_I18n::te('form.extras_title'); ?></h3>
             <div class="bookflow-extras-list">
-                <?php foreach ($extras as $ex) : ?>
+                <?php foreach ($extras as $ex) : // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- local loop variable, not a global ?>
                 <label class="bookflow-extra-row">
                     <input type="checkbox" name="bookflow_extras[]" class="bookflow-extra-check" value="<?php echo esc_attr($ex->id); ?>">
                     <span class="bookflow-extra-title"><?php echo esc_html($ex->title); ?></span>

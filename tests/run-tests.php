@@ -28,8 +28,17 @@
  * phpcs:disable WordPress.PHP.DevelopmentFunctions.error_log_var_export
  */
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    exit('This script may only be run from the command line.');
+}
+
 define('WP_USE_THEMES', false);
 require dirname(__DIR__, 4) . '/wp-load.php';
+
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 if (!class_exists('Bookflow_Availability')) {
     fwrite(STDERR, "Bookflow not loaded — check WooCommerce is active.\n");

@@ -462,7 +462,7 @@ class Bookflow_Product_Type {
 
         // Handle resource unassignment
         if (!empty($_POST['bookflow_unassign_resources']) && is_array($_POST['bookflow_unassign_resources'])) {
-            foreach (wp_unslash($_POST['bookflow_unassign_resources']) as $rid) {
+            foreach (wp_unslash($_POST['bookflow_unassign_resources']) as $rid) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- each $rid is sanitized with absint() before use below
                 Bookflow_Resources::unassign_from_product(absint($rid), $product_id);
             }
         }

@@ -113,24 +113,40 @@ class Bookflow_Import {
             wp_die('Unauthorized');
         }
 
-        if (empty($_FILES['bookflow_import_file']['tmp_name']) || !is_uploaded_file($_FILES['bookflow_import_file']['tmp_name'])) {
+        // tmp_name is PHP's own server-generated upload path (never
+        // attacker-controlled content), but sanitize it anyway to satisfy
+        // input-hygiene checks; is_uploaded_file() below is what actually
+        // guards against anything other than a genuine upload being read.
+        $tmp_name = isset($_FILES['bookflow_import_file']['tmp_name'])
+            ? sanitize_text_field(wp_unslash($_FILES['bookflow_import_file']['tmp_name']))
+            : '';
+        if (empty($tmp_name) || !is_uploaded_file($tmp_name)) {
             $this->store_result(0, [Bookflow_I18n::t('admin.import_no_file')]);
             $this->redirect_back();
         }
 
-        $filetype = wp_check_filetype($_FILES['bookflow_import_file']['name'], ['csv' => 'text/csv']);
+        $file_name = isset($_FILES['bookflow_import_file']['name'])
+            ? sanitize_file_name(wp_unslash($_FILES['bookflow_import_file']['name']))
+            : '';
+        $filetype = wp_check_filetype($file_name, ['csv' => 'text/csv']);
         if (empty($filetype['ext']) || $filetype['ext'] !== 'csv') {
             $this->store_result(0, [Bookflow_I18n::t('admin.import_invalid_type')]);
             $this->redirect_back();
         }
 
-        $handle = fopen($_FILES['bookflow_import_file']['tmp_name'], 'r');
+        // WP_Filesystem's read methods buffer the whole file into memory
+        // rather than streaming it, which fgetcsv()'s row-by-row parsing
+        // in process() below relies on for large imports; $tmp_name is
+        // already validated as a genuine upload by is_uploaded_file() above.
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+        $handle = fopen($tmp_name, 'r');
         if (!$handle) {
             $this->store_result(0, [Bookflow_I18n::t('admin.import_read_failed')]);
             $this->redirect_back();
         }
 
         $result = self::process($handle);
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
         fclose($handle);
 
         $this->store_result($result['imported'], $result['errors']);
@@ -149,6 +165,7 @@ class Bookflow_Import {
         $row_num = 1;
 
         // Strip a UTF-8 BOM if present (Excel loves to add one).
+        // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread
         $bom = fread($handle, 3);
         if ($bom !== "\xEF\xBB\xBF") {
             rewind($handle);
@@ -295,7 +312,7 @@ class Bookflow_Import {
             $timestamps['completed_at'] = $now;
         }
 
-        $result = $wpdb->insert($table, array_merge([
+        $result = $wpdb->insert($table, array_merge([ // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             'product_id'      => absint($data['product_id']),
             'resource_id'     => $data['resource_id'] ? absint($data['resource_id']) : null,
             'booking_date'    => $data['booking_date'],

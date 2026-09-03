@@ -93,7 +93,7 @@ class Bookflow_Ajax {
 
         // Handle person types or simple count
         $person_types_raw = isset($_POST['person_types']) && is_array($_POST['person_types'])
-            ? wp_unslash($_POST['person_types'])
+            ? wp_unslash($_POST['person_types']) // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- every element ('person_type_id', 'quantity') is sanitized with absint() in the loop below before use
             : null;
         if ($person_types_raw && is_array($person_types_raw)) {
             $persons_data = [];

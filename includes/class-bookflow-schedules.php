@@ -157,7 +157,7 @@ class Bookflow_Schedules {
             ? wp_json_encode(array_map('sanitize_text_field', $data['time_slots']))
             : '[]';
 
-        $result = $wpdb->insert($wpdb->prefix . 'bookflow_product_schedules', [
+        $result = $wpdb->insert($wpdb->prefix . 'bookflow_product_schedules', [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             'product_id'            => absint($data['product_id']),
             'option_group'          => sanitize_text_field($data['option_group'] ?? 'language'),
             'option_label'          => sanitize_text_field($data['option_label'] ?? ''),
@@ -182,7 +182,7 @@ class Bookflow_Schedules {
      */
     public static function get($id) {
         global $wpdb;
-        return $wpdb->get_row($wpdb->prepare(
+        return $wpdb->get_row($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT * FROM {$wpdb->prefix}bookflow_product_schedules WHERE id = %d",
             absint($id)
         ));
@@ -196,12 +196,15 @@ class Bookflow_Schedules {
      */
     public static function get_all($product_id = null) {
         global $wpdb;
+        // $sql is only ever extended with fixed literal fragments — the
+        // one dynamic value ($product_id) already went through %d +
+        // prepare() above before the literal ORDER BY is appended.
         $sql = "SELECT * FROM {$wpdb->prefix}bookflow_product_schedules";
         if ($product_id) {
-            $sql = $wpdb->prepare($sql . " WHERE product_id = %d", absint($product_id));
+            $sql = $wpdb->prepare($sql . " WHERE product_id = %d", absint($product_id)); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
         }
         $sql .= " ORDER BY product_id ASC, sort_order ASC, id ASC";
-        return $wpdb->get_results($sql);
+        return $wpdb->get_results($sql); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- $sql is either the fixed base query or that query with $product_id already substituted via prepare() above
     }
 
     /**
@@ -214,7 +217,7 @@ class Bookflow_Schedules {
     public static function get_for_product($product_id, $option_group = null) {
         global $wpdb;
         if ($option_group) {
-            return $wpdb->get_results($wpdb->prepare(
+            return $wpdb->get_results($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
                 "SELECT * FROM {$wpdb->prefix}bookflow_product_schedules
                  WHERE product_id = %d AND option_group = %s AND status = 'active'
                  ORDER BY sort_order ASC, id ASC",
@@ -222,7 +225,7 @@ class Bookflow_Schedules {
                 sanitize_text_field($option_group)
             ));
         }
-        return $wpdb->get_results($wpdb->prepare(
+        return $wpdb->get_results($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT * FROM {$wpdb->prefix}bookflow_product_schedules
              WHERE product_id = %d AND status = 'active'
              ORDER BY sort_order ASC, id ASC",
@@ -262,7 +265,7 @@ class Bookflow_Schedules {
             return false;
         }
 
-        return $wpdb->update($wpdb->prefix . 'bookflow_product_schedules', $update, ['id' => absint($id)]);
+        return $wpdb->update($wpdb->prefix . 'bookflow_product_schedules', $update, ['id' => absint($id)]); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
     }
 
     /**
@@ -273,7 +276,7 @@ class Bookflow_Schedules {
      */
     public static function delete($id) {
         global $wpdb;
-        return $wpdb->delete($wpdb->prefix . 'bookflow_product_schedules', ['id' => absint($id)], ['%d']);
+        return $wpdb->delete($wpdb->prefix . 'bookflow_product_schedules', ['id' => absint($id)], ['%d']); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
     }
 
     // ---------------------------------------------------------------
@@ -288,7 +291,7 @@ class Bookflow_Schedules {
      */
     public static function get_option_groups($product_id) {
         global $wpdb;
-        return $wpdb->get_col($wpdb->prepare(
+        return $wpdb->get_col($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT DISTINCT option_group FROM {$wpdb->prefix}bookflow_product_schedules
              WHERE product_id = %d ORDER BY option_group ASC",
             absint($product_id)
@@ -333,7 +336,7 @@ class Bookflow_Schedules {
      */
     public static function product_has_schedules($product_id) {
         global $wpdb;
-        return (bool) $wpdb->get_var($wpdb->prepare(
+        return (bool) $wpdb->get_var($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT COUNT(*) FROM {$wpdb->prefix}bookflow_product_schedules WHERE product_id = %d",
             absint($product_id)
         ));
@@ -357,25 +360,25 @@ class Bookflow_Schedules {
 
         // Parse available_days (array of checkboxes)
         $available_days = isset($_POST['available_days']) && is_array($_POST['available_days'])
-            ? array_map('sanitize_text_field', $_POST['available_days'])
+            ? array_map('sanitize_text_field', wp_unslash($_POST['available_days']))
             : [];
 
         // Parse time_slots (textarea, one per line)
-        $time_slots_raw = sanitize_textarea_field($_POST['time_slots'] ?? '');
+        $time_slots_raw = sanitize_textarea_field(wp_unslash($_POST['time_slots'] ?? ''));
         $time_slots = array_values(array_filter(array_map('trim', explode("\n", $time_slots_raw))));
 
         $data = [
             'product_id'            => absint($_POST['product_id'] ?? 0),
-            'option_group'          => sanitize_text_field($_POST['option_group'] ?? 'language'),
-            'option_label'          => sanitize_text_field($_POST['option_label'] ?? ''),
-            'option_value'          => sanitize_text_field($_POST['option_value'] ?? ''),
+            'option_group'          => sanitize_text_field(wp_unslash($_POST['option_group'] ?? 'language')),
+            'option_label'          => sanitize_text_field(wp_unslash($_POST['option_label'] ?? '')),
+            'option_value'          => sanitize_text_field(wp_unslash($_POST['option_value'] ?? '')),
             'available_days'        => $available_days,
             'time_slots'            => $time_slots,
             'max_persons'           => absint($_POST['max_persons'] ?? 0),
             'max_bookings_per_slot' => absint($_POST['max_bookings_per_slot'] ?? 0),
             'price_modifier'        => floatval($_POST['price_modifier'] ?? 0),
             'sort_order'            => absint($_POST['sort_order'] ?? 0),
-            'status'                => sanitize_text_field($_POST['status'] ?? 'active'),
+            'status'                => sanitize_text_field(wp_unslash($_POST['status'] ?? 'active')),
         ];
 
         if ($id) {

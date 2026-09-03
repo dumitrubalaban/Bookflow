@@ -35,7 +35,7 @@ class Bookflow_PingMe {
     public static function register_channel(array $channels): array {
         $channels[] = [
             'key' => 'bookings',
-            'label' => __('Bookings', 'bookflow'),
+            'label' => Bookflow_I18n::t('pingme.channel_bookings'),
             'icon' => 'calendar',
             // Same idea as PingMe_Connect's own "orders" channel: point at
             // an API the app already knows how to authenticate against
@@ -50,14 +50,14 @@ class Bookflow_PingMe {
     /** @param array<string, array{title?: string, fields: array}> $views */
     public static function register_view(array $views): array {
         $views['booking.created'] = [
-            'title' => __('#{{id}} — {{product_name}}', 'bookflow'),
+            'title' => Bookflow_I18n::t('pingme.view_title'),
             'fields' => [
-                ['key' => 'customer_name', 'label' => __('Customer', 'bookflow'), 'type' => 'text'],
-                ['key' => 'booking_date', 'label' => __('Date', 'bookflow'), 'type' => 'date'],
-                ['key' => 'start_time', 'label' => __('Time', 'bookflow'), 'type' => 'text'],
-                ['key' => 'persons_total', 'label' => __('Guests', 'bookflow'), 'type' => 'text'],
-                ['key' => 'cost', 'label' => __('Total', 'bookflow'), 'type' => 'currency'],
-                ['key' => 'status', 'label' => __('Status', 'bookflow'), 'type' => 'badge'],
+                ['key' => 'customer_name', 'label' => Bookflow_I18n::t('pingme.field_customer'), 'type' => 'text'],
+                ['key' => 'booking_date', 'label' => Bookflow_I18n::t('pingme.field_date'), 'type' => 'date'],
+                ['key' => 'start_time', 'label' => Bookflow_I18n::t('pingme.field_time'), 'type' => 'text'],
+                ['key' => 'persons_total', 'label' => Bookflow_I18n::t('pingme.field_guests'), 'type' => 'text'],
+                ['key' => 'cost', 'label' => Bookflow_I18n::t('pingme.field_total'), 'type' => 'currency'],
+                ['key' => 'status', 'label' => Bookflow_I18n::t('pingme.field_status'), 'type' => 'badge'],
             ],
         ];
         return $views;
@@ -75,16 +75,15 @@ class Bookflow_PingMe {
         }
 
         $product = wc_get_product($booking->product_id);
-        $product_name = $product ? $product->get_name() : __('Booking', 'bookflow');
+        $product_name = $product ? $product->get_name() : Bookflow_I18n::t('pingme.booking_fallback');
 
         PingMe_Notify::event(
             'booking.created',
             self::payload($booking, $product_name, $product),
             [
-                'title' => __('New booking', 'bookflow'),
-                'body' => sprintf(
-                    /* translators: 1: product/service name, 2: booking date, 3: start time */
-                    __('%1$s — %2$s at %3$s', 'bookflow'),
+                'title' => Bookflow_I18n::t('pingme.new_booking_title'),
+                'body' => Bookflow_I18n::t(
+                    'pingme.new_booking_body',
                     $product_name,
                     self::format_date($booking->booking_date),
                     $booking->start_time
@@ -113,7 +112,7 @@ class Bookflow_PingMe {
         }
 
         $product = wc_get_product($booking->product_id);
-        $product_name = $product ? $product->get_name() : __('Booking', 'bookflow');
+        $product_name = $product ? $product->get_name() : Bookflow_I18n::t('pingme.booking_fallback');
         $payload = self::payload($booking, $product_name, $product);
         $payload['from'] = $old_status;
         $payload['to'] = $new_status;
@@ -131,46 +130,29 @@ class Bookflow_PingMe {
         switch ($status) {
             case 'confirmed':
                 return [
-                    'title' => __('Booking confirmed', 'bookflow'),
-                    'body' => sprintf(
-                        /* translators: %s: product/service name */
-                        __('%s is confirmed', 'bookflow'),
-                        $product_name
-                    ),
+                    'title' => Bookflow_I18n::t('pingme.confirmed_title'),
+                    'body' => Bookflow_I18n::t('pingme.confirmed_body', $product_name),
                 ];
             case 'paid':
                 return [
-                    'title' => __('Booking paid', 'bookflow'),
-                    'body' => sprintf(
-                        /* translators: %s: product/service name */
-                        __('Payment received for %s', 'bookflow'),
-                        $product_name
-                    ),
+                    'title' => Bookflow_I18n::t('pingme.paid_title'),
+                    'body' => Bookflow_I18n::t('pingme.paid_body', $product_name),
                 ];
             case 'cancelled':
                 return [
-                    'title' => __('Booking cancelled', 'bookflow'),
+                    'title' => Bookflow_I18n::t('pingme.cancelled_title'),
                     'body' => $booking->cancellation_reason
-                        ? sprintf(
-                            /* translators: 1: product/service name, 2: cancellation reason */
-                            __('%1$s was cancelled: %2$s', 'bookflow'),
+                        ? Bookflow_I18n::t(
+                            'pingme.cancelled_body_with_reason',
                             $product_name,
                             wp_trim_words($booking->cancellation_reason, 12)
                         )
-                        : sprintf(
-                            /* translators: %s: product/service name */
-                            __('%s was cancelled', 'bookflow'),
-                            $product_name
-                        ),
+                        : Bookflow_I18n::t('pingme.cancelled_body', $product_name),
                 ];
             case 'no-show':
                 return [
-                    'title' => __('Marked as no-show', 'bookflow'),
-                    'body' => sprintf(
-                        /* translators: %s: product/service name */
-                        __('%s was marked as a no-show', 'bookflow'),
-                        $product_name
-                    ),
+                    'title' => Bookflow_I18n::t('pingme.no_show_title'),
+                    'body' => Bookflow_I18n::t('pingme.no_show_body', $product_name),
                 ];
             default:
                 // in-progress, completed, and anything a future version adds:

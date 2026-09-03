@@ -204,13 +204,15 @@ class Bookflow_Bookings_List_Table extends WP_List_Table {
             $args['trashed_only'] = true;
         }
 
-        if (!empty($_REQUEST['status']))     $args['status']     = sanitize_text_field(wp_unslash($_REQUEST['status']));
-        if (!empty($_REQUEST['product_id'])) $args['product_id'] = absint($_REQUEST['product_id']);
-        if (!empty($_REQUEST['s']))          $args['search']     = sanitize_text_field(wp_unslash($_REQUEST['s']));
+        // Read-only list table filter/search/sort params (GET or the "Filter"
+        // form's POST submit) — no state change, so no nonce is required.
+        if (!empty($_REQUEST['status']))     $args['status']     = sanitize_text_field(wp_unslash($_REQUEST['status'])); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        if (!empty($_REQUEST['product_id'])) $args['product_id'] = absint($_REQUEST['product_id']); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        if (!empty($_REQUEST['s']))          $args['search']     = sanitize_text_field(wp_unslash($_REQUEST['s'])); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
         // The "m" month-picker (YYYYMM, same convention as WP core's own
         // months_dropdown()) takes priority over the manual date range when set.
-        $m = sanitize_text_field(wp_unslash($_REQUEST['m'] ?? '0'));
+        $m = sanitize_text_field(wp_unslash($_REQUEST['m'] ?? '0')); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only filter, no state change
         if ($m && $m !== '0' && preg_match('/^\d{6}$/', $m)) {
             $year = (int) substr($m, 0, 4);
             $month = (int) substr($m, 4, 2);
@@ -218,8 +220,8 @@ class Bookflow_Bookings_List_Table extends WP_List_Table {
             $args['date_from'] = sprintf('%04d-%02d-01', $year, $month);
             $args['date_to']   = sprintf('%04d-%02d-%02d', $year, $month, $last_day);
         } else {
-            if (!empty($_REQUEST['date_from'])) $args['date_from'] = sanitize_text_field(wp_unslash($_REQUEST['date_from']));
-            if (!empty($_REQUEST['date_to']))   $args['date_to']   = sanitize_text_field(wp_unslash($_REQUEST['date_to']));
+            if (!empty($_REQUEST['date_from'])) $args['date_from'] = sanitize_text_field(wp_unslash($_REQUEST['date_from'])); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            if (!empty($_REQUEST['date_to']))   $args['date_to']   = sanitize_text_field(wp_unslash($_REQUEST['date_to'])); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         }
 
         return $args;
@@ -235,12 +237,14 @@ class Bookflow_Bookings_List_Table extends WP_List_Table {
         global $wpdb;
         $table = $wpdb->prefix . 'bookflow_bookings';
         $trash_clause = $this->view === 'trash' ? 'deleted_at IS NOT NULL' : 'deleted_at IS NULL';
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- custom table, no core API exists; live data required for booking/availability integrity; $table and $trash_clause are both fixed literal strings (table prefix + literal, or one of two hardcoded clauses), never user input
         return $wpdb->get_results(
             "SELECT DISTINCT YEAR(booking_date) AS year, MONTH(booking_date) AS month
              FROM $table
              WHERE $trash_clause
              ORDER BY year DESC, month DESC"
         );
+        // phpcs:enable
     }
 
     /**
@@ -253,11 +257,12 @@ class Bookflow_Bookings_List_Table extends WP_List_Table {
         if ($which !== 'top') {
             return;
         }
-        $status_filter  = sanitize_text_field(wp_unslash($_REQUEST['status'] ?? ''));
-        $product_filter = absint($_REQUEST['product_id'] ?? 0);
-        $date_from      = sanitize_text_field(wp_unslash($_REQUEST['date_from'] ?? ''));
-        $date_to        = sanitize_text_field(wp_unslash($_REQUEST['date_to'] ?? ''));
-        $month_filter   = sanitize_text_field(wp_unslash($_REQUEST['m'] ?? '0'));
+        // Read-only filter bar values used only to repopulate the form controls.
+        $status_filter  = sanitize_text_field(wp_unslash($_REQUEST['status'] ?? '')); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $product_filter = absint($_REQUEST['product_id'] ?? 0); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $date_from      = sanitize_text_field(wp_unslash($_REQUEST['date_from'] ?? '')); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $date_to        = sanitize_text_field(wp_unslash($_REQUEST['date_to'] ?? '')); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $month_filter   = sanitize_text_field(wp_unslash($_REQUEST['m'] ?? '0')); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         ?>
         <div class="alignleft actions">
             <select name="status">
@@ -301,8 +306,8 @@ class Bookflow_Bookings_List_Table extends WP_List_Table {
         $args['limit']  = $per_page;
         $args['offset'] = ($current_page - 1) * $per_page;
 
-        $orderby = sanitize_text_field(wp_unslash($_GET['orderby'] ?? 'booking_date'));
-        $order   = sanitize_text_field(wp_unslash($_GET['order'] ?? 'desc'));
+        $orderby = sanitize_text_field(wp_unslash($_GET['orderby'] ?? 'booking_date')); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only sort param, no state change
+        $order   = sanitize_text_field(wp_unslash($_GET['order'] ?? 'desc')); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only sort param, no state change
         $args['orderby'] = $orderby;
         $args['order']   = $order;
 

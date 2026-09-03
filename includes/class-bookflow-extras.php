@@ -89,7 +89,7 @@ class Bookflow_Extras {
 
     public static function create($data) {
         global $wpdb;
-        $wpdb->insert($wpdb->prefix . 'bookflow_extras', [
+        $wpdb->insert($wpdb->prefix . 'bookflow_extras', [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             'title'       => sanitize_text_field($data['title']),
             'description' => sanitize_textarea_field($data['description'] ?? ''),
             'price'       => (float) ($data['price'] ?? 0),
@@ -101,7 +101,7 @@ class Bookflow_Extras {
 
     public static function get($id) {
         global $wpdb;
-        return $wpdb->get_row($wpdb->prepare(
+        return $wpdb->get_row($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             "SELECT * FROM {$wpdb->prefix}bookflow_extras WHERE id = %d",
             absint($id)
         ));
@@ -109,12 +109,15 @@ class Bookflow_Extras {
 
     public static function get_all($status = null) {
         global $wpdb;
+        // $sql is only ever extended with fixed literal fragments — the
+        // one dynamic value ($status) already went through %s + prepare()
+        // above before the literal ORDER BY is appended.
         $sql = "SELECT * FROM {$wpdb->prefix}bookflow_extras";
         if ($status) {
-            $sql = $wpdb->prepare($sql . " WHERE status = %s", $status);
+            $sql = $wpdb->prepare($sql . " WHERE status = %s", $status); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
         }
         $sql .= " ORDER BY sort_order ASC, title ASC";
-        return $wpdb->get_results($sql);
+        return $wpdb->get_results($sql); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- $sql is either the fixed base query or that query with $status already substituted via prepare() above
     }
 
     /**
@@ -129,10 +132,12 @@ class Bookflow_Extras {
             return [];
         }
         $placeholders = implode(',', array_fill(0, count($ids), '%d'));
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- $placeholders always has exactly count($ids) %d placeholders and $ids is spread as the matching args; custom table, no core API exists; phpcs can't see any of this statically
         return $wpdb->get_results($wpdb->prepare(
             "SELECT * FROM {$wpdb->prefix}bookflow_extras WHERE status = 'active' AND id IN ($placeholders)",
             ...$ids
         ));
+        // phpcs:enable
     }
 
     public static function update($id, $data) {
@@ -144,12 +149,12 @@ class Bookflow_Extras {
         if (isset($data['sort_order']))  $update['sort_order'] = absint($data['sort_order']);
         if (isset($data['status']))      $update['status'] = sanitize_text_field($data['status']);
 
-        return $wpdb->update($wpdb->prefix . 'bookflow_extras', $update, ['id' => absint($id)]);
+        return $wpdb->update($wpdb->prefix . 'bookflow_extras', $update, ['id' => absint($id)]); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
     }
 
     public static function delete($id) {
         global $wpdb;
-        return $wpdb->delete($wpdb->prefix . 'bookflow_extras', ['id' => absint($id)], ['%d']);
+        return $wpdb->delete($wpdb->prefix . 'bookflow_extras', ['id' => absint($id)], ['%d']); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
     }
 
     // --- AJAX ---

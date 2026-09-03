@@ -54,9 +54,9 @@ class Bookflow_Frontend {
 
         $using_svelte = file_exists(BOOKFLOW_PLUGIN_DIR . 'public/dist/bookflow-widget.js');
 
-        do_action('woocommerce_before_add_to_cart_form');
+        do_action('woocommerce_before_add_to_cart_form'); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own hook name, not this plugin's
         ?>
-        <form class="cart" action="<?php echo esc_url(apply_filters('woocommerce_add_to_cart_form_action', $product->get_permalink())); ?>" method="post" enctype="multipart/form-data">
+        <form class="cart" action="<?php echo esc_url(apply_filters('woocommerce_add_to_cart_form_action', $product->get_permalink())); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own hook name, not this plugin's ?>" method="post" enctype="multipart/form-data">
             <?php
             // Svelte (svelte-src/) renders the entire wizard AND its own
             // submit button inside #bookflow-svelte-root — including the
@@ -65,7 +65,7 @@ class Bookflow_Frontend {
             // .bookflow-booking-form div open (see templates/booking-form.php)
             // so this final-nav can be injected as its last child; that's
             // the only reason for the stray-looking closing </div> below.
-            do_action('woocommerce_before_add_to_cart_button');
+            do_action('woocommerce_before_add_to_cart_button'); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own hook name, not this plugin's
             if (!$using_svelte) :
             ?>
             <div class="bookflow-wizard-nav bookflow-final-nav" id="bookflow-final-nav">
@@ -76,10 +76,10 @@ class Bookflow_Frontend {
             </div>
             </div><!-- .bookflow-booking-form, opened inside templates/booking-form.php -->
             <?php endif; ?>
-            <?php do_action('woocommerce_after_add_to_cart_button'); ?>
+            <?php do_action('woocommerce_after_add_to_cart_button'); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own hook name, not this plugin's ?>
         </form>
         <?php
-        do_action('woocommerce_after_add_to_cart_form');
+        do_action('woocommerce_after_add_to_cart_form'); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce's own hook name, not this plugin's
     }
 
     public function enqueue_scripts() {
@@ -319,14 +319,14 @@ class Bookflow_Frontend {
         global $post;
         $previous_product = $GLOBALS['product'] ?? null;
         $previous_post = $post;
-        $GLOBALS['product'] = $product;
+        $GLOBALS['product'] = $product; // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- must match WooCommerce's own "global $product" convention that its templates/hooks read; a prefixed name would break template compatibility
         $post = get_post($product->get_id());
 
         ob_start();
         $this->add_to_cart_template();
         $html = ob_get_clean();
 
-        $GLOBALS['product'] = $previous_product;
+        $GLOBALS['product'] = $previous_product; // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- restoring WooCommerce's own global $product to its prior value
         $post = $previous_post;
 
         return $html;
