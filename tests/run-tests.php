@@ -14,6 +14,17 @@
  * cleans up everything it created (idempotent — safe to re-run).
  *
  * @package Bookflow
+ *
+ * This file is a standalone CLI dev tool: it is never require()'d by the
+ * plugin's own runtime (not in bookflow.php's includes list) and is only
+ * ever invoked directly via `php tests/run-tests.php` at a terminal, so
+ * WordPress.org's public-facing coding standards for output-escaping,
+ * filesystem-API-only access, and global-prefixing don't apply here the
+ * way they do to code that runs inside a live request.
+ * phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped
+ * phpcs:disable WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
+ * phpcs:disable WordPress.NamingConventions.PrefixAllGlobals
+ * phpcs:disable WordPress.DB.DirectDatabaseQuery
  */
 
 define('WP_USE_THEMES', false);

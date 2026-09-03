@@ -37,6 +37,8 @@ class Bookflow_Vouchers {
         ]);
     }
 
+    // Hooked to woocommerce_process_product_meta, which WooCommerce core
+    // only fires after its own product-edit-screen nonce check.
     public function save_product_field($product_id) {
         update_post_meta($product_id, '_bookflow_is_gift_voucher', isset($_POST['_bookflow_is_gift_voucher']) ? 'yes' : 'no');
     }

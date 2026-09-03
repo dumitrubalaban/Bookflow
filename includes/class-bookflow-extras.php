@@ -106,11 +106,11 @@ class Bookflow_Extras {
 
         $id = absint($_POST['id'] ?? 0);
         $data = [
-            'title'       => sanitize_text_field($_POST['title'] ?? ''),
-            'description' => sanitize_textarea_field($_POST['description'] ?? ''),
+            'title'       => sanitize_text_field(wp_unslash($_POST['title'] ?? '')),
+            'description' => sanitize_textarea_field(wp_unslash($_POST['description'] ?? '')),
             'price'       => (float) ($_POST['price'] ?? 0),
             'sort_order'  => absint($_POST['sort_order'] ?? 0),
-            'status'      => sanitize_text_field($_POST['status'] ?? 'active'),
+            'status'      => sanitize_text_field(wp_unslash($_POST['status'] ?? 'active')),
         ];
 
         if ($id) {
@@ -137,13 +137,13 @@ class Bookflow_Extras {
      * Render extras admin page
      */
     public function render_page() {
-        if (isset($_POST['bookflow_save_extra'], $_POST['_wpnonce']) && wp_verify_nonce($_POST['_wpnonce'], 'bookflow_save_extra')) {
+        if (isset($_POST['bookflow_save_extra'], $_POST['_wpnonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['_wpnonce'])), 'bookflow_save_extra')) {
             $data = [
-                'title'       => sanitize_text_field($_POST['title'] ?? ''),
-                'description' => sanitize_textarea_field($_POST['description'] ?? ''),
+                'title'       => sanitize_text_field(wp_unslash($_POST['title'] ?? '')),
+                'description' => sanitize_textarea_field(wp_unslash($_POST['description'] ?? '')),
                 'price'       => (float) ($_POST['price'] ?? 0),
                 'sort_order'  => absint($_POST['sort_order'] ?? 0),
-                'status'      => sanitize_text_field($_POST['status'] ?? 'active'),
+                'status'      => sanitize_text_field(wp_unslash($_POST['status'] ?? 'active')),
             ];
             $id = absint($_POST['extra_id'] ?? 0);
             if ($id) {
@@ -154,7 +154,7 @@ class Bookflow_Extras {
             echo '<div class="notice notice-success"><p>' . esc_html(Bookflow_I18n::t('admin.extra_saved')) . '</p></div>';
         }
 
-        if (isset($_GET['delete'], $_GET['_wpnonce']) && wp_verify_nonce($_GET['_wpnonce'], 'bookflow_delete_extra')) {
+        if (isset($_GET['delete'], $_GET['_wpnonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_GET['_wpnonce'])), 'bookflow_delete_extra')) {
             self::delete(absint($_GET['delete']));
             echo '<div class="notice notice-success"><p>' . esc_html(Bookflow_I18n::t('admin.extra_deleted')) . '</p></div>';
         }

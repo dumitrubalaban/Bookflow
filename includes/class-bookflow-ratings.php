@@ -74,6 +74,12 @@ class Bookflow_Ratings {
 
     /**
      * Public rating page at /?bookflow_rate={booking_id}&token=...
+     *
+     * No WP nonce here by design: this is a public, unauthenticated page
+     * reached from an emailed link, with no logged-in session to tie a
+     * nonce to. The unguessable per-booking rating_token (checked via
+     * hash_equals() below) is the actual auth mechanism, same pattern as
+     * the existing booking self-cancel link elsewhere in this plugin.
      */
     public function maybe_render_rating_page() {
         if (!isset($_GET['bookflow_rate'])) {
@@ -174,6 +180,9 @@ class Bookflow_Ratings {
         ));
     }
 
+    // No WP nonce by design — same public unauthenticated-link auth
+    // pattern as maybe_render_rating_page() above; the per-booking
+    // rating_token IS the CSRF/auth check (hash_equals() below).
     public function ajax_submit() {
         $booking_id = absint($_POST['booking_id'] ?? 0);
         $token = sanitize_text_field(wp_unslash($_POST['token'] ?? ''));

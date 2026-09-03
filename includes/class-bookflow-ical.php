@@ -230,6 +230,11 @@ class Bookflow_iCal {
         // Tell WP REST not to JSON-encode our string
         add_filter('rest_pre_serve_request', function ($served, $result) use ($ics) {
             if (!$served) {
+                // Not HTML — this is a raw iCalendar (.ics) file body with
+                // Content-Type: text/calendar. Escaping for HTML output here
+                // would corrupt the ICS syntax. Field values are already
+                // escaped per RFC 5545 rules at build time via self::esc().
+                // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
                 echo $ics;
                 return true;
             }

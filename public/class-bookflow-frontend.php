@@ -36,6 +36,10 @@ class Bookflow_Frontend {
             return;
         }
 
+        // wc_get_stock_html() returns pre-escaped HTML from WooCommerce core
+        // (the same call WC's own simple.php add-to-cart template uses
+        // unescaped) — nothing here to further sanitize.
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
         echo wc_get_stock_html($product);
 
         do_action('woocommerce_before_add_to_cart_form');

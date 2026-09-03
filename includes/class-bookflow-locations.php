@@ -177,6 +177,11 @@ class Bookflow_Locations {
      * "monday,tuesday" -> ['monday','tuesday']. Same convention as the
      * product-level available-days checkboxes.
      */
+    /**
+     * Called only from render_page() and ajax_save(), both of which verify
+     * a nonce (wp_verify_nonce()/check_ajax_referer()) before reaching this
+     * point — no nonce check needed here too.
+     */
     private static function collect_post_data() {
         $days = [];
         foreach (['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as $day) {
@@ -185,19 +190,19 @@ class Bookflow_Locations {
             }
         }
         $parse_dates = function ($raw) {
-            return array_values(array_filter(array_map('trim', preg_split('/[\r\n]+/', (string) $raw))));
+            return array_values(array_filter(array_map('trim', preg_split('/[\r\n]+/', (string) wp_unslash($raw)))));
         };
 
         return [
-            'name'           => sanitize_text_field($_POST['name'] ?? ''),
-            'address'        => sanitize_text_field($_POST['address'] ?? ''),
-            'lat'            => $_POST['lat'] ?? '',
-            'lng'            => $_POST['lng'] ?? '',
+            'name'           => sanitize_text_field(wp_unslash($_POST['name'] ?? '')),
+            'address'        => sanitize_text_field(wp_unslash($_POST['address'] ?? '')),
+            'lat'            => sanitize_text_field(wp_unslash($_POST['lat'] ?? '')),
+            'lng'            => sanitize_text_field(wp_unslash($_POST['lng'] ?? '')),
             'available_days' => $days,
             'blocked_dates'  => $parse_dates($_POST['blocked_dates'] ?? ''),
             'holidays'       => $parse_dates($_POST['holidays'] ?? ''),
             'sort_order'     => absint($_POST['sort_order'] ?? 0),
-            'status'         => sanitize_text_field($_POST['status'] ?? 'active'),
+            'status'         => sanitize_text_field(wp_unslash($_POST['status'] ?? 'active')),
         ];
     }
 
@@ -205,7 +210,7 @@ class Bookflow_Locations {
      * Render locations admin page
      */
     public function render_page() {
-        if (isset($_POST['bookflow_save_location'], $_POST['_wpnonce']) && wp_verify_nonce($_POST['_wpnonce'], 'bookflow_save_location')) {
+        if (isset($_POST['bookflow_save_location'], $_POST['_wpnonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['_wpnonce'])), 'bookflow_save_location')) {
             $data = self::collect_post_data();
             $id = absint($_POST['location_id'] ?? 0);
             if ($id) {
@@ -216,7 +221,7 @@ class Bookflow_Locations {
             echo '<div class="notice notice-success"><p>' . esc_html(Bookflow_I18n::t('admin.location_saved')) . '</p></div>';
         }
 
-        if (isset($_GET['delete'], $_GET['_wpnonce']) && wp_verify_nonce($_GET['_wpnonce'], 'bookflow_delete_location')) {
+        if (isset($_GET['delete'], $_GET['_wpnonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_GET['_wpnonce'])), 'bookflow_delete_location')) {
             self::delete(absint($_GET['delete']));
             echo '<div class="notice notice-success"><p>' . esc_html(Bookflow_I18n::t('admin.location_deleted')) . '</p></div>';
         }
