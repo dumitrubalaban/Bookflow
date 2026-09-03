@@ -1,0 +1,27 @@
+{
+  "name": "bookflow-widget",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build && vite build --config vite.admin-calendar.config.js && vite build --config vite.admin-resources.config.js && vite build --config vite.admin-extras.config.js && vite build --config vite.admin-locations.config.js",
+    "build:widget": "vite build",
+    "build:admin-calendar": "vite build --config vite.admin-calendar.config.js",
+    "build:admin-resources": "vite build --config vite.admin-resources.config.js",
+    "build:admin-extras": "vite build --config vite.admin-extras.config.js",
+    "build:admin-locations": "vite build --config vite.admin-locations.config.js"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^4.0.4",
+    "@tailwindcss/vite": "^4.3.3",
+    "svelte": "^5.57.0",
+    "tailwindcss": "^4.3.3",
+    "vite": "^5.4.11"
+  },
+  "dependencies": {
+    "@internationalized/date": "^3.12.4",
+    "@lucide/svelte": "^1.40.0",
+    "bits-ui": "^2.19.0"
+  }
+}

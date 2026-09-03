@@ -54,7 +54,7 @@ function assert_equals($expected, $actual, $label) {
     assert_true($expected == $actual, "$label (expected " . var_export($expected, true) . ", got " . var_export($actual, true) . ")");
 }
 
-// --- fixtures ---
+// --- fixtures  ---
 
 function bf_create_test_product($args = []) {
     $product = new WC_Product_Booking();

@@ -42,10 +42,22 @@ class Bookflow_Frontend {
         // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
         echo wc_get_stock_html($product);
 
+        $using_svelte = file_exists(BOOKFLOW_PLUGIN_DIR . 'public/dist/bookflow-widget.js');
+
         do_action('woocommerce_before_add_to_cart_form');
         ?>
         <form class="cart" action="<?php echo esc_url(apply_filters('woocommerce_add_to_cart_form_action', $product->get_permalink())); ?>" method="post" enctype="multipart/form-data">
-            <?php do_action('woocommerce_before_add_to_cart_button'); // renders the whole wizard, incl. its own .bookflow-booking-form opening tag ?>
+            <?php
+            // Svelte (svelte-src/) renders the entire wizard AND its own
+            // submit button inside #bookflow-svelte-root — including the
+            // final "Book Now" button — so nothing extra is needed here.
+            // The legacy vanilla-JS widget instead leaves its
+            // .bookflow-booking-form div open (see templates/booking-form.php)
+            // so this final-nav can be injected as its last child; that's
+            // the only reason for the stray-looking closing </div> below.
+            do_action('woocommerce_before_add_to_cart_button');
+            if (!$using_svelte) :
+            ?>
             <div class="bookflow-wizard-nav bookflow-final-nav" id="bookflow-final-nav">
                 <input type="hidden" name="add-to-cart" value="<?php echo esc_attr($product->get_id()); ?>">
                 <button type="submit" id="bookflow-submit" name="add-to-cart" value="<?php echo esc_attr($product->get_id()); ?>" class="bookflow-wizard-next" disabled>
@@ -53,6 +65,7 @@ class Bookflow_Frontend {
                 </button>
             </div>
             </div><!-- .bookflow-booking-form, opened inside templates/booking-form.php -->
+            <?php endif; ?>
             <?php do_action('woocommerce_after_add_to_cart_button'); ?>
         </form>
         <?php
@@ -77,7 +90,25 @@ class Bookflow_Frontend {
         }
 
         wp_enqueue_style('bookflow-booking', BOOKFLOW_PLUGIN_URL . 'public/css/booking.css', [], BOOKFLOW_VERSION);
-        wp_enqueue_script('bookflow-booking', BOOKFLOW_PLUGIN_URL . 'public/js/booking-calendar.js', [], BOOKFLOW_VERSION, true);
+
+        $widget_js = BOOKFLOW_PLUGIN_DIR . 'public/dist/bookflow-widget.js';
+        $widget_css = BOOKFLOW_PLUGIN_DIR . 'public/dist/bookflow-widget.css';
+        $using_svelte = file_exists($widget_js);
+        if ($using_svelte) {
+            // Svelte-built widget (svelte-src/, `npm run build`). Falls back
+            // to the legacy vanilla-JS widget below if the bundle hasn't
+            // been built yet, so a fresh checkout never renders a blank form.
+            if (file_exists($widget_css)) {
+                wp_enqueue_style('bookflow-widget', BOOKFLOW_PLUGIN_URL . 'public/dist/bookflow-widget.css', ['bookflow-booking'], filemtime($widget_css));
+            }
+            // Versioned by file mtime (not BOOKFLOW_VERSION) so every
+            // `npm run build` in svelte-src/ busts the browser cache
+            // without needing a plugin version bump.
+            wp_enqueue_script('bookflow-widget', BOOKFLOW_PLUGIN_URL . 'public/dist/bookflow-widget.js', [], filemtime($widget_js), true);
+        } else {
+            wp_enqueue_script('bookflow-booking', BOOKFLOW_PLUGIN_URL . 'public/js/booking-calendar.js', [], BOOKFLOW_VERSION, true);
+        }
+        $script_handle = $using_svelte ? 'bookflow-widget' : 'bookflow-booking';
 
         $has_person_types = Bookflow_Person_Types::product_has_types($post->ID);
         $person_types = $has_person_types ? Bookflow_Person_Types::get_for_product($post->ID) : [];
@@ -87,11 +118,12 @@ class Bookflow_Frontend {
 
         $person_types_data = array_map(function ($pt) {
             return [
-                'id'       => (int) $pt->id,
-                'name'     => $pt->name,
-                'cost'     => (float) $pt->cost,
-                'min_qty'  => (int) $pt->min_qty,
-                'max_qty'  => (int) $pt->max_qty,
+                'id'            => (int) $pt->id,
+                'name'          => $pt->name,
+                'cost'          => (float) $pt->cost,
+                'costFormatted' => wp_kses_post(wc_price($pt->cost)),
+                'min_qty'       => (int) $pt->min_qty,
+                'max_qty'       => (int) $pt->max_qty,
             ];
         }, $person_types);
 
@@ -112,7 +144,7 @@ class Bookflow_Frontend {
             ];
         }, $schedules);
 
-        wp_localize_script('bookflow-booking', 'bookflowBooking', [
+        wp_localize_script($script_handle, 'bookflowBooking', [
             'ajaxUrl'         => admin_url('admin-ajax.php'),
             'nonce'           => wp_create_nonce('bookflow_nonce'),
             'restUrl'         => esc_url_raw(rest_url('bookflow/v1/')),
@@ -128,6 +160,20 @@ class Bookflow_Frontend {
             'hasResources'    => $has_resources,
             'hasSchedules'    => $has_schedules,
             'schedules'       => $schedules_data,
+            'termsText'       => get_post_meta($post->ID, '_bookflow_terms_text', true),
+            'addToCartText'   => $product->single_add_to_cart_text(),
+            'extras'          => array_map(function ($ex) {
+                return [
+                    'id'            => (int) $ex->id,
+                    'title'         => $ex->title,
+                    'price'         => (float) $ex->price,
+                    // Pre-formatted with wc_price() so the widget shows the
+                    // same "15,00 MDL" style as every other price on the
+                    // page, instead of naively concatenating currency+price
+                    // (which is all the client has enough info to do).
+                    'priceFormatted' => wp_kses_post(wc_price($ex->price)),
+                ];
+            }, class_exists('Bookflow_Extras') ? Bookflow_Extras::get_all('active') : []),
             'i18n'            => [
                 'selectDate'      => Bookflow_I18n::t('calendar.select_date'),
                 'selectTime'      => Bookflow_I18n::t('calendar.select_time'),
@@ -176,6 +222,19 @@ class Bookflow_Frontend {
                 'errorGeneric'    => Bookflow_I18n::t('calendar.error_generic'),
                 'retry'           => Bookflow_I18n::t('calendar.retry'),
                 'noAvailability'  => Bookflow_I18n::t('calendar.no_availability'),
+                'participants'    => Bookflow_I18n::t('form.participants'),
+                'numberOfPersons' => Bookflow_I18n::t('form.number_of_persons'),
+                'contactDetails'  => Bookflow_I18n::t('form.contact_details'),
+                'fullName'        => Bookflow_I18n::t('form.full_name'),
+                'phone'           => Bookflow_I18n::t('form.phone'),
+                'notesOptional'   => Bookflow_I18n::t('form.notes_optional'),
+                'pricePerPerson'  => Bookflow_I18n::t('form.price_per_person'),
+                'persons'         => Bookflow_I18n::t('form.persons'),
+                'bookingDetails'  => Bookflow_I18n::t('form.booking_details'),
+                'extrasTitle'     => Bookflow_I18n::t('form.extras_title'),
+                'termsAgree'      => Bookflow_I18n::t('form.terms_agree'),
+                'depositPaidNow'  => Bookflow_I18n::t('cart.deposit_paid_now'),
+                'balanceDue'      => Bookflow_I18n::t('cart.balance_due'),
             ],
             'languageSelector' => apply_filters('bookflow_language_selector_id', 'bookflow-language'),
             'langDropdown'     => apply_filters('bookflow_lang_dropdown_id', 'bookflow-lang-select'),

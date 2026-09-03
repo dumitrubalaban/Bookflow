@@ -437,10 +437,15 @@
 .bookflow-field textarea {
     width: 100%;
     padding: 11px 14px;
-    background: var(--bookflow-bg-alt);
+    /* !important: the host theme/WooCommerce ships a higher-specificity
+       `input[type=...]{background:#fff}` reset that otherwise wins on just
+       this property, leaving our light text on its white background —
+       this widget owns its own color scheme and must not inherit the
+       host's form-field styling piecemeal. */
+    background: var(--bookflow-bg-alt) !important;
     border: 1px solid var(--bookflow-border);
     border-radius: var(--bookflow-radius-sm);
-    color: var(--bookflow-text);
+    color: var(--bookflow-text) !important;
     font-size: 14px;
     transition: border-color 0.2s var(--bookflow-ease), box-shadow 0.2s var(--bookflow-ease);
 }

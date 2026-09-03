@@ -22,8 +22,83 @@ class Bookflow_Locations {
 
     public function __construct() {
         add_action('admin_menu', [$this, 'add_submenu']);
+        add_action('admin_enqueue_scripts', [$this, 'enqueue']);
         add_action('wp_ajax_bookflow_save_location', [$this, 'ajax_save']);
         add_action('wp_ajax_bookflow_delete_location', [$this, 'ajax_delete']);
+        add_action('wp_ajax_bookflow_list_locations', [$this, 'ajax_list']);
+    }
+
+    const DAY_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+    public function enqueue($hook) {
+        if (strpos($hook, 'bookflow-locations') === false) {
+            return;
+        }
+        $bundle_js = BOOKFLOW_PLUGIN_DIR . 'admin/dist/admin-locations.js';
+        if (!file_exists($bundle_js)) {
+            return;
+        }
+        $bundle_css = BOOKFLOW_PLUGIN_DIR . 'admin/dist/admin-locations.css';
+        if (file_exists($bundle_css)) {
+            wp_enqueue_style('bookflow-admin-locations', BOOKFLOW_PLUGIN_URL . 'admin/dist/admin-locations.css', [], BOOKFLOW_VERSION);
+        }
+        wp_enqueue_script('bookflow-admin-locations', BOOKFLOW_PLUGIN_URL . 'admin/dist/admin-locations.js', [], BOOKFLOW_VERSION, true);
+
+        $day_labels = [];
+        foreach (self::DAY_NAMES as $d) {
+            $day_labels[] = Bookflow_I18n::t('calendar.weekday.' . substr($d, 0, 3));
+        }
+
+        wp_localize_script('bookflow-admin-locations', 'bookflowAdminLocations', [
+            'ajaxUrl'   => admin_url('admin-ajax.php'),
+            'nonce'     => wp_create_nonce('bookflow_admin_nonce'),
+            'dayNames'  => self::DAY_NAMES,
+            'dayLabels' => $day_labels,
+            'i18n'      => [
+                'name'          => Bookflow_I18n::t('admin.name'),
+                'address'       => Bookflow_I18n::t('admin.address'),
+                'lat'           => Bookflow_I18n::t('admin.lat'),
+                'lng'           => Bookflow_I18n::t('admin.lng'),
+                'availableDays' => Bookflow_I18n::t('admin.available_days'),
+                'blockedDates'  => Bookflow_I18n::t('product.blocked_dates_label'),
+                'holidays'      => Bookflow_I18n::t('admin.holidays'),
+                'sortOrder'     => Bookflow_I18n::t('admin.sort_order'),
+                'status'        => Bookflow_I18n::t('admin.status'),
+                'active'        => Bookflow_I18n::t('admin.active'),
+                'inactive'      => Bookflow_I18n::t('admin.inactive'),
+                'addNew'        => Bookflow_I18n::t('admin.add_new'),
+                'edit'          => Bookflow_I18n::t('admin.edit'),
+                'delete'        => Bookflow_I18n::t('admin.delete'),
+                'save'          => Bookflow_I18n::t('admin.save'),
+                'cancel'        => Bookflow_I18n::t('admin.cancel_edit'),
+                'confirmDelete' => Bookflow_I18n::t('admin.confirm_delete'),
+                'noItems'       => Bookflow_I18n::t('admin.no_items'),
+                'errorGeneric'  => Bookflow_I18n::t('calendar.error_generic'),
+            ],
+        ]);
+    }
+
+    public function ajax_list() {
+        check_ajax_referer('bookflow_admin_nonce', 'nonce');
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(['message' => 'Unauthorized']);
+        }
+        $rows = self::get_all();
+        $result = array_map(function ($l) {
+            return [
+                'id'             => (int) $l->id,
+                'name'           => $l->name,
+                'address'        => $l->address,
+                'lat'            => $l->lat,
+                'lng'            => $l->lng,
+                'available_days' => (array) json_decode($l->available_days, true),
+                'blocked_dates'  => implode("\n", (array) json_decode($l->blocked_dates, true)),
+                'holidays'       => implode("\n", (array) json_decode($l->holidays, true)),
+                'sort_order'     => (int) $l->sort_order,
+                'status'         => $l->status,
+            ];
+        }, $rows);
+        wp_send_json_success(['items' => $result]);
     }
 
     public function add_submenu() {
@@ -218,144 +293,14 @@ class Bookflow_Locations {
      * Render locations admin page
      */
     public function render_page() {
-        if (isset($_POST['bookflow_save_location'], $_POST['_wpnonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['_wpnonce'])), 'bookflow_save_location')) {
-            $data = self::collect_post_data();
-            $id = absint($_POST['location_id'] ?? 0);
-            if ($id) {
-                self::update($id, $data);
-            } else {
-                self::create($data);
-            }
-            echo '<div class="notice notice-success"><p>' . esc_html(Bookflow_I18n::t('admin.location_saved')) . '</p></div>';
-        }
-
-        if (isset($_GET['delete'], $_GET['_wpnonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_GET['_wpnonce'])), 'bookflow_delete_location')) {
-            self::delete(absint($_GET['delete']));
-            echo '<div class="notice notice-success"><p>' . esc_html(Bookflow_I18n::t('admin.location_deleted')) . '</p></div>';
-        }
-
-        $locations = self::get_all();
-        $editing = null;
-        if (isset($_GET['edit'])) {
-            $editing = self::get(absint($_GET['edit']));
-        }
-
-        $editing_days = $editing ? (array) json_decode($editing->available_days, true) : [];
-        $editing_blocked = $editing ? implode("\n", (array) json_decode($editing->blocked_dates, true)) : '';
-        $editing_holidays = $editing ? implode("\n", (array) json_decode($editing->holidays, true)) : '';
-
-        $weekdays = [
-            'monday' => Bookflow_I18n::t('weekday.monday'), 'tuesday' => Bookflow_I18n::t('weekday.tuesday'),
-            'wednesday' => Bookflow_I18n::t('weekday.wednesday'), 'thursday' => Bookflow_I18n::t('weekday.thursday'),
-            'friday' => Bookflow_I18n::t('weekday.friday'), 'saturday' => Bookflow_I18n::t('weekday.saturday'),
-            'sunday' => Bookflow_I18n::t('weekday.sunday'),
-        ];
-
         ?>
         <div class="wrap">
             <h1 class="wp-heading-inline"><?php Bookflow_I18n::te('admin.locations'); ?></h1>
             <hr class="wp-header-end">
-            <p class="description"><?php Bookflow_I18n::te('admin.locations_desc'); ?></p>
-
-            <div id="col-container" class="wp-clearfix">
-                <div id="col-left">
-                    <div class="col-wrap">
-                        <div class="form-wrap">
-                            <h2><?php echo $editing ? esc_html(Bookflow_I18n::t('admin.edit_location')) : esc_html(Bookflow_I18n::t('admin.add_location')); ?></h2>
-                            <form method="post">
-                                <?php wp_nonce_field('bookflow_save_location'); ?>
-                                <input type="hidden" name="location_id" value="<?php echo esc_attr($editing->id ?? 0); ?>">
-
-                                <div class="form-field form-required">
-                                    <label for="bookflow-loc-name"><?php Bookflow_I18n::te('admin.title'); ?></label>
-                                    <input type="text" name="name" id="bookflow-loc-name" value="<?php echo esc_attr($editing->name ?? ''); ?>" size="40" required>
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-loc-address"><?php Bookflow_I18n::te('location.address'); ?></label>
-                                    <input type="text" name="address" id="bookflow-loc-address" value="<?php echo esc_attr($editing->address ?? ''); ?>" size="40">
-                                </div>
-
-                                <div class="form-field">
-                                    <label><?php Bookflow_I18n::te('location.coordinates'); ?></label>
-                                    <input type="text" name="lat" value="<?php echo esc_attr($editing->lat ?? ''); ?>" placeholder="47.0245" style="width:48%;">
-                                    <input type="text" name="lng" value="<?php echo esc_attr($editing->lng ?? ''); ?>" placeholder="28.8322" style="width:48%;">
-                                </div>
-
-                                <div class="form-field">
-                                    <label><?php Bookflow_I18n::te('admin.available_days'); ?></label>
-                                    <?php foreach ($weekdays as $slug => $label) : ?>
-                                        <label style="margin-right:10px;"><input type="checkbox" name="day_<?php echo esc_attr($slug); ?>" value="1" <?php checked(in_array($slug, $editing_days, true)); ?>> <?php echo esc_html($label); ?></label>
-                                    <?php endforeach; ?>
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-loc-blocked"><?php Bookflow_I18n::te('product.blocked_dates_label'); ?></label>
-                                    <textarea name="blocked_dates" id="bookflow-loc-blocked" rows="3" cols="40" placeholder="YYYY-MM-DD"><?php echo esc_textarea($editing_blocked); ?></textarea>
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-loc-holidays"><?php Bookflow_I18n::te('admin.holidays'); ?></label>
-                                    <textarea name="holidays" id="bookflow-loc-holidays" rows="3" cols="40" placeholder="YYYY-MM-DD"><?php echo esc_textarea($editing_holidays); ?></textarea>
-                                    <p class="description"><?php Bookflow_I18n::te('admin.holidays_desc'); ?></p>
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-loc-sort"><?php Bookflow_I18n::te('admin.sort_order'); ?></label>
-                                    <input type="number" name="sort_order" id="bookflow-loc-sort" value="<?php echo esc_attr($editing->sort_order ?? 0); ?>" min="0">
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-loc-status"><?php Bookflow_I18n::te('admin.status'); ?></label>
-                                    <select name="status" id="bookflow-loc-status">
-                                        <option value="active" <?php selected($editing->status ?? 'active', 'active'); ?>><?php Bookflow_I18n::te('admin.active'); ?></option>
-                                        <option value="inactive" <?php selected($editing->status ?? '', 'inactive'); ?>><?php Bookflow_I18n::te('admin.inactive'); ?></option>
-                                    </select>
-                                </div>
-
-                                <p class="submit">
-                                    <button type="submit" name="bookflow_save_location" class="button button-primary"><?php Bookflow_I18n::te('admin.save_location'); ?></button>
-                                    <?php if ($editing) : ?>
-                                        <a href="<?php echo esc_url(remove_query_arg('edit')); ?>" class="button"><?php Bookflow_I18n::te('admin.cancel_edit'); ?></a>
-                                    <?php endif; ?>
-                                </p>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="col-right">
-                    <div class="col-wrap">
-                        <table class="wp-list-table widefat fixed striped">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th><?php Bookflow_I18n::te('admin.title'); ?></th>
-                                    <th><?php Bookflow_I18n::te('location.address'); ?></th>
-                                    <th><?php Bookflow_I18n::te('admin.status'); ?></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (empty($locations)) : ?>
-                                    <tr><td colspan="4"><?php Bookflow_I18n::te('admin.no_locations'); ?></td></tr>
-                                <?php else : foreach ($locations as $loc) : ?>
-                                    <tr>
-                                        <td><?php echo esc_html($loc->id); ?></td>
-                                        <td>
-                                            <strong><a href="<?php echo esc_url(add_query_arg('edit', $loc->id)); ?>"><?php echo esc_html($loc->name); ?></a></strong>
-                                            <div class="row-actions">
-                                                <span class="edit"><a href="<?php echo esc_url(add_query_arg('edit', $loc->id)); ?>"><?php Bookflow_I18n::te('admin.edit'); ?></a> | </span>
-                                                <span class="delete"><a href="<?php echo esc_url(wp_nonce_url(add_query_arg('delete', $loc->id), 'bookflow_delete_location')); ?>" class="submitdelete" onclick="return confirm('<?php echo esc_attr(Bookflow_I18n::t('admin.delete_location_confirm')); ?>')"><?php Bookflow_I18n::te('admin.delete'); ?></a></span>
-                                            </div>
-                                        </td>
-                                        <td><?php echo esc_html($loc->address ?: '&mdash;'); ?></td>
-                                        <td><?php echo esc_html(ucfirst($loc->status)); ?></td>
-                                    </tr>
-                                <?php endforeach; endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+            <div id="bookflow-admin-locations-root" style="margin-top:16px;">
+                <?php if (!file_exists(BOOKFLOW_PLUGIN_DIR . 'admin/dist/admin-locations.js')) : ?>
+                    <p><em>Run <code>npm run build</code> in <code>svelte-src/</code> to build this page.</em></p>
+                <?php endif; ?>
             </div>
         </div>
         <?php

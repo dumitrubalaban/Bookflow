@@ -13,8 +13,65 @@ class Bookflow_Extras {
 
     public function __construct() {
         add_action('admin_menu', [$this, 'add_submenu']);
+        add_action('admin_enqueue_scripts', [$this, 'enqueue']);
         add_action('wp_ajax_bookflow_save_extra', [$this, 'ajax_save']);
         add_action('wp_ajax_bookflow_delete_extra', [$this, 'ajax_delete']);
+        add_action('wp_ajax_bookflow_list_extras', [$this, 'ajax_list']);
+    }
+
+    public function enqueue($hook) {
+        if (strpos($hook, 'bookflow-extras') === false) {
+            return;
+        }
+        $bundle_js = BOOKFLOW_PLUGIN_DIR . 'admin/dist/admin-extras.js';
+        if (!file_exists($bundle_js)) {
+            return;
+        }
+        $bundle_css = BOOKFLOW_PLUGIN_DIR . 'admin/dist/admin-extras.css';
+        if (file_exists($bundle_css)) {
+            wp_enqueue_style('bookflow-admin-extras', BOOKFLOW_PLUGIN_URL . 'admin/dist/admin-extras.css', [], BOOKFLOW_VERSION);
+        }
+        wp_enqueue_script('bookflow-admin-extras', BOOKFLOW_PLUGIN_URL . 'admin/dist/admin-extras.js', [], BOOKFLOW_VERSION, true);
+        wp_localize_script('bookflow-admin-extras', 'bookflowAdminExtras', [
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce'   => wp_create_nonce('bookflow_admin_nonce'),
+            'i18n'    => [
+                'title'         => Bookflow_I18n::t('admin.title'),
+                'description'   => Bookflow_I18n::t('admin.description'),
+                'price'         => Bookflow_I18n::t('admin.price'),
+                'sortOrder'     => Bookflow_I18n::t('admin.sort_order'),
+                'status'        => Bookflow_I18n::t('admin.status'),
+                'active'        => Bookflow_I18n::t('admin.active'),
+                'inactive'      => Bookflow_I18n::t('admin.inactive'),
+                'addNew'        => Bookflow_I18n::t('admin.add_new'),
+                'edit'          => Bookflow_I18n::t('admin.edit'),
+                'delete'        => Bookflow_I18n::t('admin.delete'),
+                'save'          => Bookflow_I18n::t('admin.save'),
+                'cancel'        => Bookflow_I18n::t('admin.cancel_edit'),
+                'confirmDelete' => Bookflow_I18n::t('admin.confirm_delete'),
+                'noItems'       => Bookflow_I18n::t('admin.no_items'),
+                'errorGeneric'  => Bookflow_I18n::t('calendar.error_generic'),
+            ],
+        ]);
+    }
+
+    public function ajax_list() {
+        check_ajax_referer('bookflow_admin_nonce', 'nonce');
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(['message' => 'Unauthorized']);
+        }
+        $rows = self::get_all();
+        $result = array_map(function ($e) {
+            return [
+                'id'          => (int) $e->id,
+                'title'       => $e->title,
+                'description' => $e->description,
+                'price'       => (float) $e->price,
+                'sort_order'  => (int) $e->sort_order,
+                'status'      => $e->status,
+            ];
+        }, $rows);
+        wp_send_json_success(['items' => $result]);
     }
 
     public function add_submenu() {
@@ -136,121 +193,18 @@ class Bookflow_Extras {
     /**
      * Render extras admin page
      */
+    /**
+     * Render extras admin page
+     */
     public function render_page() {
-        if (isset($_POST['bookflow_save_extra'], $_POST['_wpnonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['_wpnonce'])), 'bookflow_save_extra')) {
-            $data = [
-                'title'       => sanitize_text_field(wp_unslash($_POST['title'] ?? '')),
-                'description' => sanitize_textarea_field(wp_unslash($_POST['description'] ?? '')),
-                'price'       => (float) sanitize_text_field(wp_unslash($_POST['price'] ?? '')),
-                'sort_order'  => absint($_POST['sort_order'] ?? 0),
-                'status'      => sanitize_text_field(wp_unslash($_POST['status'] ?? 'active')),
-            ];
-            $id = absint($_POST['extra_id'] ?? 0);
-            if ($id) {
-                self::update($id, $data);
-            } else {
-                self::create($data);
-            }
-            echo '<div class="notice notice-success"><p>' . esc_html(Bookflow_I18n::t('admin.extra_saved')) . '</p></div>';
-        }
-
-        if (isset($_GET['delete'], $_GET['_wpnonce']) && wp_verify_nonce(sanitize_text_field(wp_unslash($_GET['_wpnonce'])), 'bookflow_delete_extra')) {
-            self::delete(absint($_GET['delete']));
-            echo '<div class="notice notice-success"><p>' . esc_html(Bookflow_I18n::t('admin.extra_deleted')) . '</p></div>';
-        }
-
-        $extras = self::get_all();
-        $editing = null;
-        if (isset($_GET['edit'])) {
-            $editing = self::get(absint($_GET['edit']));
-        }
-
         ?>
         <div class="wrap">
             <h1 class="wp-heading-inline"><?php Bookflow_I18n::te('admin.extras'); ?></h1>
             <hr class="wp-header-end">
-            <p class="description"><?php Bookflow_I18n::te('admin.extras_desc'); ?></p>
-
-            <div id="col-container" class="wp-clearfix">
-                <div id="col-left">
-                    <div class="col-wrap">
-                        <div class="form-wrap">
-                            <h2><?php echo $editing ? esc_html(Bookflow_I18n::t('admin.edit_extra')) : esc_html(Bookflow_I18n::t('admin.add_extra')); ?></h2>
-                            <form method="post">
-                                <?php wp_nonce_field('bookflow_save_extra'); ?>
-                                <input type="hidden" name="extra_id" value="<?php echo esc_attr($editing->id ?? 0); ?>">
-
-                                <div class="form-field form-required">
-                                    <label for="bookflow-extra-title"><?php Bookflow_I18n::te('admin.title'); ?></label>
-                                    <input type="text" name="title" id="bookflow-extra-title" value="<?php echo esc_attr($editing->title ?? ''); ?>" size="40" required>
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-extra-description"><?php Bookflow_I18n::te('admin.description'); ?></label>
-                                    <textarea name="description" id="bookflow-extra-description" rows="3" cols="40"><?php echo esc_textarea($editing->description ?? ''); ?></textarea>
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-extra-price"><?php Bookflow_I18n::te('admin.price'); ?></label>
-                                    <input type="number" step="0.01" min="0" name="price" id="bookflow-extra-price" value="<?php echo esc_attr($editing->price ?? 0); ?>">
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-extra-sort"><?php Bookflow_I18n::te('admin.sort_order'); ?></label>
-                                    <input type="number" name="sort_order" id="bookflow-extra-sort" value="<?php echo esc_attr($editing->sort_order ?? 0); ?>" min="0">
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-extra-status"><?php Bookflow_I18n::te('admin.status'); ?></label>
-                                    <select name="status" id="bookflow-extra-status">
-                                        <option value="active" <?php selected($editing->status ?? 'active', 'active'); ?>><?php Bookflow_I18n::te('admin.active'); ?></option>
-                                        <option value="inactive" <?php selected($editing->status ?? '', 'inactive'); ?>><?php Bookflow_I18n::te('admin.inactive'); ?></option>
-                                    </select>
-                                </div>
-
-                                <p class="submit">
-                                    <button type="submit" name="bookflow_save_extra" class="button button-primary"><?php Bookflow_I18n::te('admin.save_extra'); ?></button>
-                                    <?php if ($editing) : ?>
-                                        <a href="<?php echo esc_url(remove_query_arg('edit')); ?>" class="button"><?php Bookflow_I18n::te('admin.cancel_edit'); ?></a>
-                                    <?php endif; ?>
-                                </p>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="col-right">
-                    <div class="col-wrap">
-                        <table class="wp-list-table widefat fixed striped">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th><?php Bookflow_I18n::te('admin.title'); ?></th>
-                                    <th><?php Bookflow_I18n::te('admin.price'); ?></th>
-                                    <th><?php Bookflow_I18n::te('admin.status'); ?></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (empty($extras)) : ?>
-                                    <tr><td colspan="4"><?php Bookflow_I18n::te('admin.no_extras'); ?></td></tr>
-                                <?php else : foreach ($extras as $e) : ?>
-                                    <tr>
-                                        <td><?php echo esc_html($e->id); ?></td>
-                                        <td>
-                                            <strong><a href="<?php echo esc_url(add_query_arg('edit', $e->id)); ?>"><?php echo esc_html($e->title); ?></a></strong>
-                                            <div class="row-actions">
-                                                <span class="edit"><a href="<?php echo esc_url(add_query_arg('edit', $e->id)); ?>"><?php Bookflow_I18n::te('admin.edit'); ?></a> | </span>
-                                                <span class="delete"><a href="<?php echo esc_url(wp_nonce_url(add_query_arg('delete', $e->id), 'bookflow_delete_extra')); ?>" class="submitdelete" onclick="return confirm('<?php echo esc_attr(Bookflow_I18n::t('admin.delete_extra_confirm')); ?>')"><?php Bookflow_I18n::te('admin.delete'); ?></a></span>
-                                            </div>
-                                        </td>
-                                        <td><?php echo wp_kses_post(wc_price($e->price)); ?></td>
-                                        <td><?php echo esc_html(ucfirst($e->status)); ?></td>
-                                    </tr>
-                                <?php endforeach; endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+            <div id="bookflow-admin-extras-root" style="margin-top:16px;">
+                <?php if (!file_exists(BOOKFLOW_PLUGIN_DIR . 'admin/dist/admin-extras.js')) : ?>
+                    <p><em>Run <code>npm run build</code> in <code>svelte-src/</code> to build this page.</em></p>
+                <?php endif; ?>
             </div>
         </div>
         <?php

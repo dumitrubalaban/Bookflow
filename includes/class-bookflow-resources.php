@@ -13,8 +13,10 @@ class Bookflow_Resources {
 
     public function __construct() {
         add_action('admin_menu', [$this, 'add_submenu']);
+        add_action('admin_enqueue_scripts', [$this, 'enqueue']);
         add_action('wp_ajax_bookflow_save_resource', [$this, 'ajax_save']);
         add_action('wp_ajax_bookflow_delete_resource', [$this, 'ajax_delete']);
+        add_action('wp_ajax_bookflow_list_resources', [$this, 'ajax_list']);
     }
 
     /**
@@ -223,7 +225,73 @@ class Bookflow_Resources {
         return $available;
     }
 
+    public function enqueue($hook) {
+        if (strpos($hook, 'bookflow-resources') === false) {
+            return;
+        }
+        $bundle_js = BOOKFLOW_PLUGIN_DIR . 'admin/dist/admin-resources.js';
+        if (!file_exists($bundle_js)) {
+            return;
+        }
+        wp_enqueue_media();
+        $bundle_css = BOOKFLOW_PLUGIN_DIR . 'admin/dist/admin-resources.css';
+        if (file_exists($bundle_css)) {
+            wp_enqueue_style('bookflow-admin-resources', BOOKFLOW_PLUGIN_URL . 'admin/dist/admin-resources.css', [], BOOKFLOW_VERSION);
+        }
+        wp_enqueue_script('bookflow-admin-resources', BOOKFLOW_PLUGIN_URL . 'admin/dist/admin-resources.js', [], BOOKFLOW_VERSION, true);
+        wp_localize_script('bookflow-admin-resources', 'bookflowAdminResources', [
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce'   => wp_create_nonce('bookflow_admin_nonce'),
+            'i18n'    => [
+                'title'         => Bookflow_I18n::t('admin.title'),
+                'description'   => Bookflow_I18n::t('admin.description'),
+                'capacity'      => Bookflow_I18n::t('admin.capacity'),
+                'sortOrder'     => Bookflow_I18n::t('admin.sort_order'),
+                'status'        => Bookflow_I18n::t('admin.status'),
+                'active'        => Bookflow_I18n::t('admin.active'),
+                'inactive'      => Bookflow_I18n::t('admin.inactive'),
+                'photo'         => Bookflow_I18n::t('admin.photo'),
+                'chooseImage'   => Bookflow_I18n::t('admin.choose_image'),
+                'removeImage'   => Bookflow_I18n::t('admin.remove_image'),
+                'addNew'        => Bookflow_I18n::t('admin.add_new'),
+                'edit'          => Bookflow_I18n::t('admin.edit'),
+                'delete'        => Bookflow_I18n::t('admin.delete'),
+                'save'          => Bookflow_I18n::t('admin.save'),
+                'cancel'        => Bookflow_I18n::t('admin.cancel_edit'),
+                'confirmDelete' => Bookflow_I18n::t('admin.confirm_delete'),
+                'noItems'       => Bookflow_I18n::t('admin.no_items'),
+                'pageTitle'     => Bookflow_I18n::t('admin.resources'),
+                'errorGeneric'  => Bookflow_I18n::t('calendar.error_generic'),
+            ],
+        ]);
+    }
+
     // --- AJAX ---
+
+    public function ajax_list() {
+        check_ajax_referer('bookflow_admin_nonce', 'nonce');
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(['message' => 'Unauthorized']);
+        }
+
+        $rows = self::get_all();
+        $result = array_map(function ($r) {
+            $meta = $r->meta ? json_decode($r->meta, true) : [];
+            return [
+                'id'          => (int) $r->id,
+                'title'       => $r->title,
+                'description' => $r->description,
+                'capacity'    => (int) $r->capacity,
+                'sort_order'  => (int) $r->sort_order,
+                'status'      => $r->status,
+                'photo_id'    => (int) ($meta['photo_id'] ?? 0),
+                'photo_id_url' => self::get_photo_url($r),
+                'gallery_ids' => (array) ($meta['gallery_ids'] ?? []),
+            ];
+        }, $rows);
+
+        wp_send_json_success(['items' => $result]);
+    }
 
     public function ajax_save() {
         check_ajax_referer('bookflow_admin_nonce', 'nonce');
@@ -241,9 +309,16 @@ class Bookflow_Resources {
             'status'      => sanitize_text_field($_POST['status'] ?? 'active'),
         ];
         if (isset($_POST['photo_id']) || isset($_POST['gallery_ids'])) {
+            // gallery_ids (the portfolio picker) isn't sent by every caller
+            // of this endpoint — preserve whatever the resource already had
+            // instead of silently wiping it when only photo_id is posted.
+            $existing = $id ? self::get($id) : null;
+            $existing_meta = $existing && $existing->meta ? json_decode($existing->meta, true) : [];
             $data['meta'] = [
                 'photo_id'    => absint($_POST['photo_id'] ?? 0),
-                'gallery_ids' => self::parse_gallery_ids($_POST['gallery_ids'] ?? ''),
+                'gallery_ids' => isset($_POST['gallery_ids'])
+                    ? self::parse_gallery_ids($_POST['gallery_ids'])
+                    : (array) ($existing_meta['gallery_ids'] ?? []),
             ];
         }
 
@@ -279,245 +354,20 @@ class Bookflow_Resources {
     /**
      * Render resources admin page
      */
+    /**
+     * Render resources admin page
+     */
     public function render_page() {
-        // Handle form submission
-        if (isset($_POST['bookflow_save_resource'], $_POST['_wpnonce']) && wp_verify_nonce($_POST['_wpnonce'], 'bookflow_save_resource')) {
-            $data = [
-                'title'       => sanitize_text_field($_POST['title'] ?? ''),
-                'description' => sanitize_textarea_field($_POST['description'] ?? ''),
-                'capacity'    => absint($_POST['capacity'] ?? 0),
-                'sort_order'  => absint($_POST['sort_order'] ?? 0),
-                'status'      => sanitize_text_field($_POST['status'] ?? 'active'),
-                'meta'        => [
-                    'photo_id'    => absint($_POST['photo_id'] ?? 0),
-                    'gallery_ids' => self::parse_gallery_ids($_POST['gallery_ids'] ?? ''),
-                ],
-            ];
-            $id = absint($_POST['resource_id'] ?? 0);
-            if ($id) {
-                self::update($id, $data);
-            } else {
-                self::create($data);
-            }
-            echo '<div class="notice notice-success"><p>' . esc_html(Bookflow_I18n::t('admin.resource_saved')) . '</p></div>';
-        }
-
-        // Handle delete
-        if (isset($_GET['delete'], $_GET['_wpnonce']) && wp_verify_nonce($_GET['_wpnonce'], 'bookflow_delete_resource')) {
-            self::delete(absint($_GET['delete']));
-            echo '<div class="notice notice-success"><p>' . esc_html(Bookflow_I18n::t('admin.resource_deleted')) . '</p></div>';
-        }
-
-        $resources = self::get_all();
-        $editing = null;
-        if (isset($_GET['edit'])) {
-            $editing = self::get(absint($_GET['edit']));
-        }
-
         ?>
         <div class="wrap">
             <h1 class="wp-heading-inline"><?php Bookflow_I18n::te('admin.resources'); ?></h1>
             <hr class="wp-header-end">
-            <p class="description"><?php Bookflow_I18n::te('admin.resources_desc'); ?></p>
-
-            <div id="col-container" class="wp-clearfix">
-                <div id="col-left">
-                    <div class="col-wrap">
-                        <div class="form-wrap">
-                            <h2><?php echo $editing ? esc_html(Bookflow_I18n::t('admin.edit_resource')) : esc_html(Bookflow_I18n::t('admin.add_resource')); ?></h2>
-                            <form method="post">
-                                <?php wp_nonce_field('bookflow_save_resource'); ?>
-                                <input type="hidden" name="resource_id" value="<?php echo esc_attr($editing->id ?? 0); ?>">
-
-                                <div class="form-field form-required">
-                                    <label for="bookflow-res-title"><?php Bookflow_I18n::te('admin.title'); ?></label>
-                                    <input type="text" name="title" id="bookflow-res-title" value="<?php echo esc_attr($editing->title ?? ''); ?>" size="40" required>
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-res-description"><?php Bookflow_I18n::te('admin.description'); ?></label>
-                                    <textarea name="description" id="bookflow-res-description" rows="3" cols="40"><?php echo esc_textarea($editing->description ?? ''); ?></textarea>
-                                </div>
-
-                                <?php $photo_id = 0; $photo_url = ''; if ($editing) {
-                                    $meta = $editing->meta ? json_decode($editing->meta, true) : [];
-                                    $photo_id = absint($meta['photo_id'] ?? 0);
-                                    $photo_url = self::get_photo_url($editing);
-                                } ?>
-                                <div class="form-field">
-                                    <label><?php Bookflow_I18n::te('admin.photo'); ?></label>
-                                    <div>
-                                        <img id="bookflow-res-photo-preview" src="<?php echo esc_url($photo_url); ?>" style="max-width:100px; max-height:100px; display:<?php echo $photo_url ? 'block' : 'none'; ?>; margin-bottom:8px; border-radius:4px;">
-                                        <input type="hidden" name="photo_id" id="bookflow-res-photo-id" value="<?php echo esc_attr($photo_id); ?>">
-                                        <button type="button" class="button" id="bookflow-res-photo-select"><?php Bookflow_I18n::te('admin.select_image'); ?></button>
-                                        <button type="button" class="button" id="bookflow-res-photo-remove" style="<?php echo $photo_url ? '' : 'display:none;'; ?>"><?php Bookflow_I18n::te('admin.remove'); ?></button>
-                                    </div>
-                                </div>
-
-                                <?php
-                                $gallery_ids = $editing ? array_filter(array_map('absint', (array) ($meta['gallery_ids'] ?? []))) : [];
-                                $gallery_urls = $editing ? self::get_gallery_urls($editing) : [];
-                                ?>
-                                <div class="form-field">
-                                    <label><?php Bookflow_I18n::te('admin.portfolio_photos'); ?></label>
-                                    <p class="description" style="margin-top:0;"><?php Bookflow_I18n::te('admin.portfolio_photos_desc'); ?></p>
-                                    <div id="bookflow-res-gallery-preview" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
-                                        <?php foreach ($gallery_urls as $i => $url) : ?>
-                                            <div class="bookflow-gallery-thumb" data-id="<?php echo esc_attr($gallery_ids[$i] ?? ''); ?>" style="position:relative;">
-                                                <img src="<?php echo esc_url($url); ?>" style="width:60px; height:60px; object-fit:cover; border-radius:4px;">
-                                                <a href="#" class="bookflow-gallery-remove" style="position:absolute; top:-6px; right:-6px; background:#d63638; color:#fff; border-radius:50%; width:18px; height:18px; line-height:18px; text-align:center; font-size:12px; text-decoration:none;">&times;</a>
-                                            </div>
-                                        <?php endforeach; ?>
-                                    </div>
-                                    <input type="hidden" name="gallery_ids" id="bookflow-res-gallery-ids" value="<?php echo esc_attr(implode(',', $gallery_ids)); ?>">
-                                    <button type="button" class="button" id="bookflow-res-gallery-select"><?php Bookflow_I18n::te('admin.add_photos'); ?></button>
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-res-capacity"><?php Bookflow_I18n::te('admin.capacity'); ?></label>
-                                    <input type="number" name="capacity" id="bookflow-res-capacity" value="<?php echo esc_attr($editing->capacity ?? 0); ?>" min="0">
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-res-sort"><?php Bookflow_I18n::te('admin.sort_order'); ?></label>
-                                    <input type="number" name="sort_order" id="bookflow-res-sort" value="<?php echo esc_attr($editing->sort_order ?? 0); ?>" min="0">
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-res-status"><?php Bookflow_I18n::te('admin.status'); ?></label>
-                                    <select name="status" id="bookflow-res-status">
-                                        <option value="active" <?php selected($editing->status ?? 'active', 'active'); ?>><?php Bookflow_I18n::te('admin.active'); ?></option>
-                                        <option value="inactive" <?php selected($editing->status ?? '', 'inactive'); ?>><?php Bookflow_I18n::te('admin.inactive'); ?></option>
-                                    </select>
-                                </div>
-
-                                <p class="submit">
-                                    <button type="submit" name="bookflow_save_resource" class="button button-primary"><?php Bookflow_I18n::te('admin.save_resource'); ?></button>
-                                    <?php if ($editing) : ?>
-                                        <a href="<?php echo esc_url(remove_query_arg('edit')); ?>" class="button"><?php Bookflow_I18n::te('admin.cancel_edit'); ?></a>
-                                    <?php endif; ?>
-                                </p>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="col-right">
-                    <div class="col-wrap">
-                        <table class="wp-list-table widefat fixed striped">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th><?php Bookflow_I18n::te('admin.title'); ?></th>
-                                    <th><?php Bookflow_I18n::te('admin.capacity'); ?></th>
-                                    <th><?php Bookflow_I18n::te('admin.status'); ?></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (empty($resources)) : ?>
-                                    <tr><td colspan="4"><?php Bookflow_I18n::te('admin.no_resources'); ?></td></tr>
-                                <?php else : foreach ($resources as $r) : ?>
-                                    <tr>
-                                        <td><?php echo esc_html($r->id); ?></td>
-                                        <td>
-                                            <strong><a href="<?php echo esc_url(add_query_arg('edit', $r->id)); ?>"><?php echo esc_html($r->title); ?></a></strong>
-                                            <div class="row-actions">
-                                                <span class="edit"><a href="<?php echo esc_url(add_query_arg('edit', $r->id)); ?>"><?php Bookflow_I18n::te('admin.edit'); ?></a> | </span>
-                                                <span class="delete"><a href="<?php echo esc_url(wp_nonce_url(add_query_arg('delete', $r->id), 'bookflow_delete_resource')); ?>" class="submitdelete" onclick="return confirm('<?php echo esc_attr(Bookflow_I18n::t('admin.delete_resource_confirm')); ?>')"><?php Bookflow_I18n::te('admin.delete'); ?></a></span>
-                                            </div>
-                                        </td>
-                                        <td><?php echo esc_html($r->capacity ?: '&mdash;'); ?></td>
-                                        <td><?php echo esc_html(ucfirst($r->status)); ?></td>
-                                    </tr>
-                                <?php endforeach; endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+            <div id="bookflow-admin-resources-root" style="margin-top:16px;">
+                <?php if (!file_exists(BOOKFLOW_PLUGIN_DIR . 'admin/dist/admin-resources.js')) : ?>
+                    <p><em>Run <code>npm run build</code> in <code>svelte-src/</code> to build this page.</em></p>
+                <?php endif; ?>
             </div>
         </div>
-        <script>
-        (function () {
-            var frame;
-            document.getElementById('bookflow-res-photo-select').addEventListener('click', function (e) {
-                e.preventDefault();
-                if (frame) { frame.open(); return; }
-                frame = wp.media({
-                    title: <?php echo wp_json_encode(Bookflow_I18n::t('admin.select_a_photo')); ?>,
-                    button: { text: <?php echo wp_json_encode(Bookflow_I18n::t('admin.use_this_photo')); ?> },
-                    library: { type: 'image' },
-                    multiple: false,
-                });
-                frame.on('select', function () {
-                    var attachment = frame.state().get('selection').first().toJSON();
-                    document.getElementById('bookflow-res-photo-id').value = attachment.id;
-                    var preview = document.getElementById('bookflow-res-photo-preview');
-                    preview.src = (attachment.sizes && attachment.sizes.thumbnail) ? attachment.sizes.thumbnail.url : attachment.url;
-                    preview.style.display = 'block';
-                    document.getElementById('bookflow-res-photo-remove').style.display = 'inline-block';
-                });
-                frame.open();
-            });
-            document.getElementById('bookflow-res-photo-remove').addEventListener('click', function (e) {
-                e.preventDefault();
-                document.getElementById('bookflow-res-photo-id').value = 0;
-                var preview = document.getElementById('bookflow-res-photo-preview');
-                preview.style.display = 'none';
-                preview.src = '';
-                this.style.display = 'none';
-            });
-
-            var galleryFrame;
-            var galleryInput = document.getElementById('bookflow-res-gallery-ids');
-            var galleryPreview = document.getElementById('bookflow-res-gallery-preview');
-
-            function galleryIds() {
-                return galleryInput.value ? galleryInput.value.split(',').filter(Boolean) : [];
-            }
-
-            function addGalleryThumb(id, url) {
-                var div = document.createElement('div');
-                div.className = 'bookflow-gallery-thumb';
-                div.dataset.id = id;
-                div.style.position = 'relative';
-                div.innerHTML = '<img src="' + url + '" style="width:60px; height:60px; object-fit:cover; border-radius:4px;">' +
-                    '<a href="#" class="bookflow-gallery-remove" style="position:absolute; top:-6px; right:-6px; background:#d63638; color:#fff; border-radius:50%; width:18px; height:18px; line-height:18px; text-align:center; font-size:12px; text-decoration:none;">&times;</a>';
-                galleryPreview.appendChild(div);
-            }
-
-            document.getElementById('bookflow-res-gallery-select').addEventListener('click', function (e) {
-                e.preventDefault();
-                galleryFrame = wp.media({
-                    title: <?php echo wp_json_encode(Bookflow_I18n::t('admin.add_portfolio_photos')); ?>,
-                    button: { text: <?php echo wp_json_encode(Bookflow_I18n::t('admin.add_selected')); ?> },
-                    library: { type: 'image' },
-                    multiple: true,
-                });
-                galleryFrame.on('select', function () {
-                    var selection = galleryFrame.state().get('selection').toJSON();
-                    var ids = galleryIds();
-                    selection.forEach(function (attachment) {
-                        var id = String(attachment.id);
-                        if (ids.indexOf(id) !== -1) return;
-                        ids.push(id);
-                        var url = (attachment.sizes && attachment.sizes.thumbnail) ? attachment.sizes.thumbnail.url : attachment.url;
-                        addGalleryThumb(id, url);
-                    });
-                    galleryInput.value = ids.join(',');
-                });
-                galleryFrame.open();
-            });
-
-            galleryPreview.addEventListener('click', function (e) {
-                if (!e.target.classList.contains('bookflow-gallery-remove')) return;
-                e.preventDefault();
-                var thumb = e.target.closest('.bookflow-gallery-thumb');
-                var id = thumb.dataset.id;
-                galleryInput.value = galleryIds().filter(function (x) { return x !== id; }).join(',');
-                thumb.remove();
-            });
-        })();
-        </script>
         <?php
     }
 }

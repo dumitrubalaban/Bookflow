@@ -1,0 +1,74 @@
+/* Utilities + theme tokens only — deliberately skip tailwindcss/preflight.
+   Preflight resets buttons/headings/inputs globally, which would bleed
+   into the rest of the WooCommerce/theme page around this widget. We only
+   want Tailwind's utility classes inside #bookflow-svelte-root. */
+@config "../tailwind.config.js";
+@import "tailwindcss/theme" layer(theme);
+@import "tailwindcss/utilities" layer(utilities);
+
+/* We skip tailwindcss/preflight (see comment above) to avoid clashing with
+   the host page, but preflight is also where Tailwind's universal
+   `box-sizing: border-box` reset lives. Without it, any element combining
+   `w-full` with padding/border (content-box's default) renders wider than
+   its container — e.g. the admin calendar's "View" button overflowed its
+   own panel by ~10px. Scoped to our own roots only, so it can't affect the
+   host page around the widget. */
+#bookflow-booking-form, #bookflow-booking-form *,
+[id^="bookflow-admin-"], [id^="bookflow-admin-"] * {
+    box-sizing: border-box;
+}
+
+@theme {
+    --color-bf-accent: #c9a24b;
+    --color-bf-accent-dark: #a9832f;
+    --color-bf-bg: #101010;
+    --color-bf-bg-alt: #1a1a1a;
+    --color-bf-border: #2e2e2e;
+}
+
+/* Inside a flex container, `width: auto` on these icon <svg> elements
+   resolves to 0 even though `height: auto` correctly reads the intrinsic
+   height from the width/height attributes — a browser replaced-element
+   sizing quirk, not a competing stylesheet (verified: no other rule on
+   the page touches `width` on these elements). Every lucide icon here is
+   a square 24x24 viewBox, so forcing aspect-ratio makes width track the
+   (correctly-computed) height instead of trusting auto-sizing for both. */
+#bookflow-booking-form svg {
+    width: auto !important;
+    height: auto !important;
+    aspect-ratio: 1 / 1 !important;
+    flex-shrink: 0 !important;
+    display: inline-block !important;
+    margin: 0 !important;
+    transition: none !important;
+}
+
+/* Same root cause as the svg fix above, one layer up: per the CSS
+   cascade-layers spec, an *unlayered* !important rule always beats a
+   *layered* !important rule regardless of specificity or source order —
+   and our Tailwind utilities all live in `@layer utilities`, while the
+   host theme's legacy button reset (padding/background/min-width) is
+   plain unlayered CSS. A plain, unlayered rule here is what actually wins. */
+#bookflow-booking-form [role="checkbox"] {
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    background-color: transparent !important;
+}
+#bookflow-booking-form [role="checkbox"][data-state="checked"] {
+    background-color: var(--color-bf-accent) !important;
+}
+#bookflow-booking-form [role="switch"] {
+    padding: 0 !important;
+    min-width: 0 !important;
+}
+
+@keyframes bookflow-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+}
+.animate-shake {
+    animation: bookflow-shake 0.3s ease;
+}

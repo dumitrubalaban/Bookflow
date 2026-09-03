@@ -219,6 +219,7 @@ class Bookflow_Ajax {
                 'photoUrl'    => Bookflow_Resources::get_photo_url($r),
                 'capacity'    => (int) $r->capacity,
                 'cost'        => (float) $r->base_cost,
+                'costFormatted' => $r->base_cost > 0 ? wp_kses_post(wc_price($r->base_cost)) : '',
                 'avgRating'   => (float) $r->avg_rating,
                 'ratingCount' => (int) $r->rating_count,
             ];
@@ -257,6 +258,7 @@ class Bookflow_Ajax {
                 'photoUrl'    => Bookflow_Resources::get_photo_url($r),
                 'capacity'    => (int) $r->capacity,
                 'cost'        => (float) $r->base_cost,
+                'costFormatted' => $r->base_cost > 0 ? wp_kses_post(wc_price($r->base_cost)) : '',
                 'avgRating'   => (float) $r->avg_rating,
                 'ratingCount' => (int) $r->rating_count,
             ];

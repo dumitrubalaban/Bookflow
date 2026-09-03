@@ -18,6 +18,18 @@ $person_types   = $has_person_types ? Bookflow_Person_Types::get_for_product($pr
 $has_resources  = $product->has_resources();
 $terms_text     = get_post_meta($product_id, '_bookflow_terms_text', true);
 $extras         = Bookflow_Extras::get_all('active');
+
+// The Svelte build (svelte-src/, `npm run build`) owns the entire wizard
+// once it exists — it renders into this single mount point instead of the
+// hand-written markup below. Keeping the legacy markup as a fallback means
+// a checkout without a built bundle still shows a working (vanilla-JS)
+// widget rather than a blank form.
+if (file_exists(BOOKFLOW_PLUGIN_DIR . 'public/dist/bookflow-widget.js')) {
+    ?>
+    <div id="bookflow-svelte-root" data-product-id="<?php echo esc_attr($product_id); ?>"></div>
+    <?php
+    return;
+}
 ?>
 
 <div class="bookflow-booking-form bookflow-wizard" id="bookflow-booking-form">
