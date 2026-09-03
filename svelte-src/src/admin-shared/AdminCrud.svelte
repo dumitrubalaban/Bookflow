@@ -24,7 +24,12 @@
         body.append('action', action);
         body.append('nonce', config.nonce);
         for (const k in data) {
-            if (data[k] !== undefined && data[k] !== null) body.append(k, data[k]);
+            if (data[k] === undefined || data[k] === null) continue;
+            if (Array.isArray(data[k])) {
+                data[k].forEach((v) => body.append(k + '[]', v));
+            } else {
+                body.append(k, data[k]);
+            }
         }
         return fetch(config.ajaxUrl, { method: 'POST', body })
             .then((r) => r.json())
@@ -59,14 +64,19 @@
 
     function buildPayload() {
         const payload = { ...panelItem };
-        // A `days` field stores an array of day-name strings, but the
-        // backend (shared with the classic admin form) expects individual
-        // `day_monday=1`, `day_tuesday=1` ... flags rather than one array
-        // field — expand it here instead of teaching the server two
-        // formats.
+        // A `days` field stores an array of day-name strings, but not
+        // every backend wants the same wire shape: Locations' classic form
+        // handler expects individual `day_monday=1` ... flags, while
+        // Schedules expects a real `available_days[]` array — opt into the
+        // array shape per-field via `dayFormat: 'array'` rather than
+        // teaching every backend the other's format.
         fields.forEach((f) => {
             if (f.type === 'days') {
                 const selected = payload[f.key] || [];
+                if (f.dayFormat === 'array') {
+                    payload[f.key] = selected;
+                    return;
+                }
                 delete payload[f.key];
                 (f.dayNames || []).forEach((name) => {
                     if (selected.includes(name)) payload['day_' + name] = 1;

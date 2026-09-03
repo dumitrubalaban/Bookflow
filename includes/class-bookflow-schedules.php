@@ -16,8 +16,110 @@ class Bookflow_Schedules {
 
     public function __construct() {
         add_action('admin_menu', [$this, 'add_submenu']);
+        add_action('admin_enqueue_scripts', [$this, 'enqueue']);
         add_action('wp_ajax_bookflow_save_schedule', [$this, 'ajax_save']);
         add_action('wp_ajax_bookflow_delete_schedule', [$this, 'ajax_delete']);
+        add_action('wp_ajax_bookflow_list_schedules', [$this, 'ajax_list']);
+    }
+
+    const DAY_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+    public function enqueue($hook) {
+        if (strpos($hook, 'bookflow-schedules') === false) {
+            return;
+        }
+        $bundle_js = BOOKFLOW_PLUGIN_DIR . 'admin/dist/admin-schedules.js';
+        if (!file_exists($bundle_js)) {
+            return;
+        }
+        $bundle_css = BOOKFLOW_PLUGIN_DIR . 'admin/dist/admin-schedules.css';
+        if (file_exists($bundle_css)) {
+            wp_enqueue_style('bookflow-admin-schedules', BOOKFLOW_PLUGIN_URL . 'admin/dist/admin-schedules.css', [], BOOKFLOW_VERSION);
+        }
+        wp_enqueue_script('bookflow-admin-schedules', BOOKFLOW_PLUGIN_URL . 'admin/dist/admin-schedules.js', [], BOOKFLOW_VERSION, true);
+
+        $products = [];
+        if (function_exists('wc_get_products')) {
+            $wc_products = wc_get_products([
+                'limit' => -1, 'status' => 'publish', 'type' => ['simple', 'booking'],
+                'orderby' => 'title', 'order' => 'ASC',
+            ]);
+            foreach ($wc_products as $p) {
+                $products[] = ['id' => $p->get_id(), 'name' => $p->get_name() . ' (#' . $p->get_id() . ')'];
+            }
+        }
+
+        $day_labels = [];
+        foreach (self::DAY_NAMES as $d) {
+            $day_labels[] = Bookflow_I18n::t('calendar.weekday.' . substr($d, 0, 3));
+        }
+
+        wp_localize_script('bookflow-admin-schedules', 'bookflowAdminSchedules', [
+            'ajaxUrl'   => admin_url('admin-ajax.php'),
+            'nonce'     => wp_create_nonce('bookflow_admin_nonce'),
+            'products'  => $products,
+            'dayNames'  => self::DAY_NAMES,
+            'dayLabels' => $day_labels,
+            'i18n'      => [
+                'product'            => Bookflow_I18n::t('admin.product'),
+                'selectProduct'      => Bookflow_I18n::t('admin.select_product'),
+                'optionGroup'        => Bookflow_I18n::t('admin.option_group'),
+                'optionLabel'        => Bookflow_I18n::t('admin.option_label'),
+                'optionValue'        => Bookflow_I18n::t('admin.option_value'),
+                'availableDays'      => Bookflow_I18n::t('admin.available_days'),
+                'timeSlots'          => Bookflow_I18n::t('admin.time_slots'),
+                'maxPersons'         => Bookflow_I18n::t('admin.max_persons'),
+                'maxBookingsPerSlot' => Bookflow_I18n::t('admin.max_bookings_per_slot'),
+                'priceModifier'      => Bookflow_I18n::t('admin.price_modifier'),
+                'sortOrder'          => Bookflow_I18n::t('admin.sort_order'),
+                'status'             => Bookflow_I18n::t('admin.status'),
+                'active'             => Bookflow_I18n::t('admin.active'),
+                'inactive'           => Bookflow_I18n::t('admin.inactive'),
+                'addNew'             => Bookflow_I18n::t('admin.add_new'),
+                'edit'               => Bookflow_I18n::t('admin.edit'),
+                'delete'             => Bookflow_I18n::t('admin.delete'),
+                'save'               => Bookflow_I18n::t('admin.save'),
+                'cancel'             => Bookflow_I18n::t('admin.cancel_edit'),
+                'confirmDelete'      => Bookflow_I18n::t('admin.confirm_delete'),
+                'noItems'            => Bookflow_I18n::t('admin.no_items'),
+                'errorGeneric'       => Bookflow_I18n::t('calendar.error_generic'),
+            ],
+        ]);
+    }
+
+    public function ajax_list() {
+        check_ajax_referer('bookflow_admin_nonce', 'nonce');
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(['message' => 'Unauthorized']);
+        }
+        $rows = self::get_all();
+        $result = array_map(function ($s) {
+            $product_name = '#' . $s->product_id;
+            if (function_exists('wc_get_product')) {
+                $p = wc_get_product($s->product_id);
+                if ($p) {
+                    $product_name = $p->get_name() . ' (#' . $s->product_id . ')';
+                }
+            }
+            $days = json_decode($s->available_days, true);
+            $slots = json_decode($s->time_slots, true);
+            return [
+                'id'                    => (int) $s->id,
+                'product_id'            => (int) $s->product_id,
+                'product_name'          => $product_name,
+                'option_group'          => $s->option_group,
+                'option_label'          => $s->option_label,
+                'option_value'          => $s->option_value,
+                'available_days'        => is_array($days) ? $days : [],
+                'time_slots'            => is_array($slots) ? implode("\n", $slots) : '',
+                'max_persons'           => (int) $s->max_persons,
+                'max_bookings_per_slot' => (int) $s->max_bookings_per_slot,
+                'price_modifier'        => (float) $s->price_modifier,
+                'sort_order'            => (int) $s->sort_order,
+                'status'                => $s->status,
+            ];
+        }, $rows);
+        wp_send_json_success(['items' => $result]);
     }
 
     /**
@@ -308,246 +410,14 @@ class Bookflow_Schedules {
      * Render the Schedules admin page.
      */
     public function render_page() {
-        // Handle form POST submission
-        if (isset($_POST['bookflow_save_schedule'], $_POST['_wpnonce']) && wp_verify_nonce($_POST['_wpnonce'], 'bookflow_save_schedule')) {
-            $available_days = isset($_POST['available_days']) && is_array($_POST['available_days'])
-                ? array_map('sanitize_text_field', $_POST['available_days'])
-                : [];
-
-            $time_slots_raw = sanitize_textarea_field($_POST['time_slots'] ?? '');
-            $time_slots = array_values(array_filter(array_map('trim', explode("\n", $time_slots_raw))));
-
-            $data = [
-                'product_id'            => absint($_POST['product_id'] ?? 0),
-                'option_group'          => sanitize_text_field($_POST['option_group'] ?? 'language'),
-                'option_label'          => sanitize_text_field($_POST['option_label'] ?? ''),
-                'option_value'          => sanitize_text_field($_POST['option_value'] ?? ''),
-                'available_days'        => $available_days,
-                'time_slots'            => $time_slots,
-                'max_persons'           => absint($_POST['max_persons'] ?? 0),
-                'max_bookings_per_slot' => absint($_POST['max_bookings_per_slot'] ?? 0),
-                'price_modifier'        => floatval($_POST['price_modifier'] ?? 0),
-                'sort_order'            => absint($_POST['sort_order'] ?? 0),
-                'status'                => sanitize_text_field($_POST['status'] ?? 'active'),
-            ];
-
-            $id = absint($_POST['schedule_id'] ?? 0);
-            if ($id) {
-                self::update($id, $data);
-            } else {
-                self::create($data);
-            }
-            echo '<div class="notice notice-success"><p>' . esc_html(Bookflow_I18n::t('admin.schedule_saved')) . '</p></div>';
-        }
-
-        // Handle GET delete
-        if (isset($_GET['delete'], $_GET['_wpnonce']) && wp_verify_nonce($_GET['_wpnonce'], 'bookflow_delete_schedule')) {
-            self::delete(absint($_GET['delete']));
-            echo '<div class="notice notice-success"><p>' . esc_html(Bookflow_I18n::t('admin.schedule_deleted')) . '</p></div>';
-        }
-
-        $schedules = self::get_all();
-        $editing   = null;
-        if (isset($_GET['edit'])) {
-            $editing = self::get(absint($_GET['edit']));
-        }
-
-        // Group schedules by product for display
-        $grouped = [];
-        foreach ($schedules as $s) {
-            $grouped[$s->product_id][] = $s;
-        }
-
-        // Get booking products for the dropdown
-        $products = [];
-        if (function_exists('wc_get_products')) {
-            $products = wc_get_products([
-                'limit'  => -1,
-                'status' => 'publish',
-                'type'   => ['simple', 'booking'],
-                'orderby' => 'title',
-                'order'   => 'ASC',
-            ]);
-        }
-
-        $weekdays = [
-            'monday'    => Bookflow_I18n::t('weekday.monday'),
-            'tuesday'   => Bookflow_I18n::t('weekday.tuesday'),
-            'wednesday' => Bookflow_I18n::t('weekday.wednesday'),
-            'thursday'  => Bookflow_I18n::t('weekday.thursday'),
-            'friday'    => Bookflow_I18n::t('weekday.friday'),
-            'saturday'  => Bookflow_I18n::t('weekday.saturday'),
-            'sunday'    => Bookflow_I18n::t('weekday.sunday'),
-        ];
-
-        // Decode editing values
-        $editing_days  = [];
-        $editing_slots = '';
-        if ($editing) {
-            $decoded_days = json_decode($editing->available_days, true);
-            $editing_days = is_array($decoded_days) ? $decoded_days : [];
-
-            $decoded_slots = json_decode($editing->time_slots, true);
-            $editing_slots = is_array($decoded_slots) ? implode("\n", $decoded_slots) : '';
-        }
-
         ?>
         <div class="wrap">
             <h1 class="wp-heading-inline"><?php Bookflow_I18n::te('admin.schedules'); ?></h1>
             <hr class="wp-header-end">
-            <p class="description"><?php Bookflow_I18n::te('admin.schedules_desc'); ?></p>
-
-            <div id="col-container" class="wp-clearfix">
-                <div id="col-left">
-                    <div class="col-wrap">
-                        <div class="form-wrap">
-                            <h2><?php echo $editing ? esc_html(Bookflow_I18n::t('admin.edit_schedule')) : esc_html(Bookflow_I18n::t('admin.add_schedule')); ?></h2>
-                            <form method="post">
-                                <?php wp_nonce_field('bookflow_save_schedule'); ?>
-                                <input type="hidden" name="schedule_id" value="<?php echo esc_attr($editing->id ?? 0); ?>">
-
-                                <div class="form-field form-required">
-                                    <label for="bookflow-sch-product"><?php Bookflow_I18n::te('admin.product'); ?></label>
-                                    <select name="product_id" id="bookflow-sch-product" required>
-                                        <option value=""><?php Bookflow_I18n::te('admin.select_product'); ?></option>
-                                        <?php foreach ($products as $prod) : ?>
-                                            <option value="<?php echo esc_attr($prod->get_id()); ?>" <?php selected($editing->product_id ?? '', $prod->get_id()); ?>>
-                                                <?php echo esc_html($prod->get_name()); ?> (#<?php echo esc_html($prod->get_id()); ?>)
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-sch-group"><?php Bookflow_I18n::te('admin.option_group'); ?></label>
-                                    <input type="text" name="option_group" id="bookflow-sch-group" value="<?php echo esc_attr($editing->option_group ?? 'language'); ?>" placeholder="language">
-                                    <p><?php Bookflow_I18n::te('admin.option_group_placeholder'); ?></p>
-                                </div>
-
-                                <div class="form-field form-required">
-                                    <label for="bookflow-sch-label"><?php Bookflow_I18n::te('admin.option_label'); ?></label>
-                                    <input type="text" name="option_label" id="bookflow-sch-label" value="<?php echo esc_attr($editing->option_label ?? ''); ?>" placeholder="Română" required>
-                                    <p><?php Bookflow_I18n::te('admin.option_label_placeholder'); ?></p>
-                                </div>
-
-                                <div class="form-field form-required">
-                                    <label for="bookflow-sch-value"><?php Bookflow_I18n::te('admin.option_value'); ?></label>
-                                    <input type="text" name="option_value" id="bookflow-sch-value" value="<?php echo esc_attr($editing->option_value ?? ''); ?>" placeholder="ro" required>
-                                    <p><?php Bookflow_I18n::te('admin.option_value_placeholder'); ?></p>
-                                </div>
-
-                                <div class="form-field">
-                                    <label><?php Bookflow_I18n::te('admin.available_days'); ?></label>
-                                    <?php foreach ($weekdays as $day_key => $day_label) : ?>
-                                        <label style="display:inline-block; margin-right:10px; font-weight:normal;">
-                                            <input type="checkbox" name="available_days[]" value="<?php echo esc_attr($day_key); ?>" <?php checked(in_array($day_key, $editing_days, true)); ?>>
-                                            <?php echo esc_html($day_label); ?>
-                                        </label>
-                                    <?php endforeach; ?>
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-sch-slots"><?php Bookflow_I18n::te('admin.time_slots'); ?></label>
-                                    <textarea name="time_slots" id="bookflow-sch-slots" rows="4" cols="40" placeholder="10:00&#10;13:00&#10;16:00"><?php echo esc_textarea($editing_slots); ?></textarea>
-                                    <p><?php Bookflow_I18n::te('admin.time_slots_placeholder'); ?></p>
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-sch-maxp"><?php Bookflow_I18n::te('admin.max_persons'); ?></label>
-                                    <input type="number" name="max_persons" id="bookflow-sch-maxp" value="<?php echo esc_attr($editing->max_persons ?? 0); ?>" min="0">
-                                    <p><?php Bookflow_I18n::te('admin.max_persons_note'); ?></p>
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-sch-maxslot"><?php Bookflow_I18n::te('admin.max_bookings_per_slot'); ?></label>
-                                    <input type="number" name="max_bookings_per_slot" id="bookflow-sch-maxslot" value="<?php echo esc_attr($editing->max_bookings_per_slot ?? 0); ?>" min="0">
-                                    <p><?php Bookflow_I18n::te('admin.max_persons_note'); ?></p>
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-sch-price"><?php Bookflow_I18n::te('admin.price_modifier'); ?></label>
-                                    <input type="number" name="price_modifier" id="bookflow-sch-price" value="<?php echo esc_attr($editing->price_modifier ?? '0.00'); ?>" step="0.01">
-                                    <p><?php Bookflow_I18n::te('admin.price_modifier_note'); ?></p>
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-sch-sort"><?php Bookflow_I18n::te('admin.sort_order'); ?></label>
-                                    <input type="number" name="sort_order" id="bookflow-sch-sort" value="<?php echo esc_attr($editing->sort_order ?? 0); ?>" min="0">
-                                </div>
-
-                                <div class="form-field">
-                                    <label for="bookflow-sch-status"><?php Bookflow_I18n::te('admin.status'); ?></label>
-                                    <select name="status" id="bookflow-sch-status">
-                                        <option value="active" <?php selected($editing->status ?? 'active', 'active'); ?>><?php Bookflow_I18n::te('admin.active'); ?></option>
-                                        <option value="inactive" <?php selected($editing->status ?? '', 'inactive'); ?>><?php Bookflow_I18n::te('admin.inactive'); ?></option>
-                                    </select>
-                                </div>
-
-                                <p class="submit">
-                                    <button type="submit" name="bookflow_save_schedule" class="button button-primary"><?php Bookflow_I18n::te('admin.save_schedule'); ?></button>
-                                    <?php if ($editing) : ?>
-                                        <a href="<?php echo esc_url(remove_query_arg('edit')); ?>" class="button"><?php Bookflow_I18n::te('admin.cancel_edit'); ?></a>
-                                    <?php endif; ?>
-                                </p>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="col-right">
-                    <div class="col-wrap">
-                        <?php if (empty($grouped)) : ?>
-                            <p><?php Bookflow_I18n::te('admin.no_schedules'); ?></p>
-                        <?php else : foreach ($grouped as $pid => $product_schedules) :
-                            $product_title = $pid;
-                            if (function_exists('wc_get_product')) {
-                                $p = wc_get_product($pid);
-                                if ($p) {
-                                    $product_title = $p->get_name() . ' (#' . $pid . ')';
-                                }
-                            }
-                        ?>
-                            <h2 class="title"><?php echo esc_html($product_title); ?></h2>
-                            <table class="wp-list-table widefat fixed striped" style="margin-bottom:20px;">
-                                <thead>
-                                    <tr>
-                                        <th style="width:40px;">ID</th>
-                                        <th><?php Bookflow_I18n::te('admin.group'); ?></th>
-                                        <th><?php Bookflow_I18n::te('admin.label'); ?></th>
-                                        <th><?php Bookflow_I18n::te('admin.value'); ?></th>
-                                        <th><?php Bookflow_I18n::te('admin.days'); ?></th>
-                                        <th><?php Bookflow_I18n::te('admin.slots'); ?></th>
-                                        <th><?php Bookflow_I18n::te('admin.status'); ?></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($product_schedules as $s) :
-                                        $days_arr  = json_decode($s->available_days, true);
-                                        $slots_arr = json_decode($s->time_slots, true);
-                                        $days_str  = is_array($days_arr) ? implode(', ', array_map('ucfirst', $days_arr)) : '&mdash;';
-                                        $slots_str = is_array($slots_arr) ? implode(', ', $slots_arr) : '&mdash;';
-                                    ?>
-                                        <tr>
-                                            <td><?php echo esc_html($s->id); ?></td>
-                                            <td><?php echo esc_html($s->option_group); ?></td>
-                                            <td>
-                                                <strong><a href="<?php echo esc_url(add_query_arg('edit', $s->id)); ?>"><?php echo esc_html($s->option_label); ?></a></strong>
-                                                <div class="row-actions">
-                                                    <span class="edit"><a href="<?php echo esc_url(add_query_arg('edit', $s->id)); ?>"><?php Bookflow_I18n::te('admin.edit'); ?></a> | </span>
-                                                    <span class="delete"><a href="<?php echo esc_url(wp_nonce_url(add_query_arg('delete', $s->id), 'bookflow_delete_schedule')); ?>" class="submitdelete" onclick="return confirm('<?php echo esc_attr(Bookflow_I18n::t('admin.delete_schedule_confirm')); ?>')"><?php Bookflow_I18n::te('admin.delete'); ?></a></span>
-                                                </div>
-                                            </td>
-                                            <td><?php echo esc_html($s->option_value); ?></td>
-                                            <td><?php echo esc_html($days_str); ?></td>
-                                            <td><?php echo esc_html($slots_str); ?></td>
-                                            <td><?php echo esc_html(ucfirst($s->status)); ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        <?php endforeach; endif; ?>
-                    </div>
-                </div>
+            <div id="bookflow-admin-schedules-root" style="margin-top:16px;">
+                <?php if (!file_exists(BOOKFLOW_PLUGIN_DIR . 'admin/dist/admin-schedules.js')) : ?>
+                    <p><em>Run <code>npm run build</code> in <code>svelte-src/</code> to build this page.</em></p>
+                <?php endif; ?>
             </div>
         </div>
         <?php
