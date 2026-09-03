@@ -190,8 +190,14 @@ class Bookflow_Locations {
                 $days[] = $day;
             }
         }
+        // One YYYY-MM-DD per line; sanitize each line and drop anything
+        // that isn't actually a date rather than trusting free-form input.
         $parse_dates = function ($raw) {
-            return array_values(array_filter(array_map('trim', preg_split('/[\r\n]+/', (string) $raw))));
+            $lines = preg_split('/[\r\n]+/', sanitize_textarea_field((string) $raw));
+            $lines = array_map('trim', $lines);
+            return array_values(array_filter($lines, function ($line) {
+                return (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $line);
+            }));
         };
 
         return [
