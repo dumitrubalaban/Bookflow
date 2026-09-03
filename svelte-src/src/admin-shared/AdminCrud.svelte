@@ -131,9 +131,9 @@
 
 <div class="max-w-5xl">
     <div class="mb-4 flex items-center justify-between">
-        {#if loading}<Loader2 size={18} class="animate-spin text-bf-accent" />{:else}<span></span>{/if}
+        {#if loading}<Loader2 size={18} class="animate-spin text-bf-admin-accent" />{:else}<span></span>{/if}
         <button type="button" on:click={openAdd}
-                class="flex appearance-none items-center gap-1.5 rounded-md border-0 bg-bf-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-bf-accent-dark">
+                class="flex appearance-none items-center gap-1.5 rounded-md border-0 bg-bf-admin-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-bf-admin-accent-dark">
             <Plus size={16} />{config.i18n.addNew}
         </button>
     </div>
@@ -162,7 +162,7 @@
                     <td class="px-4 py-3">
                         <div class="flex items-center justify-end gap-1">
                             <button type="button" on:click={() => openEdit(item)}
-                                    class="flex h-8 w-8 appearance-none items-center justify-center rounded-md border-0 bg-transparent text-gray-500 transition-colors hover:bg-gray-100 hover:text-bf-accent">
+                                    class="flex h-8 w-8 appearance-none items-center justify-center rounded-md border-0 bg-transparent text-gray-500 transition-colors hover:bg-gray-100 hover:text-bf-admin-accent">
                                 <Pencil size={15} />
                             </button>
                             <button type="button" on:click={() => remove(item)} disabled={deletingId === item.id}
@@ -184,7 +184,7 @@
     <div class="flex shrink-0 items-center justify-between border-b border-gray-100 px-6 py-5">
         <h3 class="text-lg font-semibold text-gray-900">{panelItem.id ? config.i18n.edit : config.i18n.addNew}</h3>
         <button type="button" on:click={closePanel}
-                class="flex h-9 w-9 shrink-0 appearance-none items-center justify-center rounded-full border-0 bg-gray-100 text-gray-500 outline-none transition-colors hover:bg-gray-200 hover:text-gray-700 focus-visible:ring-2 focus-visible:ring-bf-accent/40 active:scale-95">
+                class="flex h-9 w-9 shrink-0 appearance-none items-center justify-center rounded-full border-0 bg-gray-100 text-gray-500 outline-none transition-colors hover:bg-gray-200 hover:text-gray-700 focus-visible:ring-2 focus-visible:ring-bf-admin-accent/40 active:scale-95">
             <X size={16} />
         </button>
     </div>
@@ -197,19 +197,19 @@
 
                 {#if field.type === 'text'}
                 <input id="bf-field-{field.key}" type="text" bind:value={panelItem[field.key]}
-                       class="w-full appearance-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition-colors focus:border-bf-accent focus:ring-2 focus:ring-bf-accent/20">
+                       class="w-full appearance-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition-colors focus:border-bf-admin-accent focus:ring-2 focus:ring-bf-admin-accent/20">
 
                 {:else if field.type === 'textarea'}
                 <textarea id="bf-field-{field.key}" rows={field.rows || 3} bind:value={panelItem[field.key]}
-                          class="w-full appearance-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition-colors focus:border-bf-accent focus:ring-2 focus:ring-bf-accent/20"></textarea>
+                          class="w-full appearance-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition-colors focus:border-bf-admin-accent focus:ring-2 focus:ring-bf-admin-accent/20"></textarea>
 
                 {:else if field.type === 'number'}
                 <input id="bf-field-{field.key}" type="number" min={field.min} max={field.max} step={field.step || 1} bind:value={panelItem[field.key]}
-                       class="w-full appearance-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition-colors focus:border-bf-accent focus:ring-2 focus:ring-bf-accent/20">
+                       class="w-full appearance-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition-colors focus:border-bf-admin-accent focus:ring-2 focus:ring-bf-admin-accent/20">
 
                 {:else if field.type === 'select'}
                 <select id="bf-field-{field.key}" bind:value={panelItem[field.key]}
-                        class="w-full appearance-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition-colors focus:border-bf-accent focus:ring-2 focus:ring-bf-accent/20">
+                        class="w-full appearance-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition-colors focus:border-bf-admin-accent focus:ring-2 focus:ring-bf-admin-accent/20">
                     {#each field.options as opt}<option value={opt.value}>{opt.label}</option>{/each}
                 </select>
 
@@ -221,7 +221,7 @@
                         <span class="flex h-14 w-14 items-center justify-center rounded-md border border-dashed border-gray-300 text-gray-300"><ImagePlus size={20} /></span>
                     {/if}
                     <button type="button" on:click={() => pickMedia(field)}
-                            class="appearance-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-bf-accent hover:text-bf-accent">
+                            class="appearance-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-bf-admin-accent hover:text-bf-admin-accent">
                         {config.i18n.chooseImage}
                     </button>
                     {#if panelItem[field.key + '_url']}
@@ -237,7 +237,7 @@
                     {#each field.dayNames as d, i}
                     <button type="button" on:click={() => toggleDay(field, d)}
                             class="flex h-8 w-8 appearance-none items-center justify-center rounded-full border-0 text-xs font-semibold transition-colors
-                                {(panelItem[field.key] || []).includes(d) ? 'bg-bf-accent text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}">
+                                {(panelItem[field.key] || []).includes(d) ? 'bg-bf-admin-accent text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}">
                         {(field.dayLabels && field.dayLabels[i]) || d}
                     </button>
                     {/each}
@@ -245,7 +245,7 @@
 
                 {:else if field.type === 'datelist'}
                 <textarea id="bf-field-{field.key}" rows={field.rows || 3} placeholder="YYYY-MM-DD" bind:value={panelItem[field.key]}
-                          class="w-full appearance-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition-colors focus:border-bf-accent focus:ring-2 focus:ring-bf-accent/20"></textarea>
+                          class="w-full appearance-none rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 outline-none transition-colors focus:border-bf-admin-accent focus:ring-2 focus:ring-bf-admin-accent/20"></textarea>
                 {/if}
 
                 {#if field.description}<p class="mt-1 text-xs text-gray-400">{field.description}</p>{/if}
@@ -261,7 +261,7 @@
             {config.i18n.cancel}
         </button>
         <button type="button" on:click={save} disabled={saving}
-                class="flex appearance-none items-center gap-1.5 rounded-md border-0 bg-bf-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-bf-accent-dark disabled:opacity-60">
+                class="flex appearance-none items-center gap-1.5 rounded-md border-0 bg-bf-admin-accent px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-bf-admin-accent-dark disabled:opacity-60">
             {#if saving}<Loader2 size={15} class="animate-spin" />{/if}
             {config.i18n.save}
         </button>

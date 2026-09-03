@@ -57,6 +57,16 @@ class Bookflow_Rate_Limit {
     }
 
     /**
+     * Public accessor for the detected client IP, for callers outside this
+     * class (e.g. passing `remoteip` to the reCAPTCHA verify API).
+     *
+     * @return string
+     */
+    public static function get_ip_public() {
+        return self::get_ip();
+    }
+
+    /**
      * Get client IP address.
      *
      * Uses the same detection logic as Bookflow_Logger.

@@ -236,7 +236,7 @@ class Bookflow_Emails {
             return $is_admin ? Bookflow_I18n::t($key) : Bookflow_I18n::t_locale($key, $locale);
         };
 
-        $accent_color = apply_filters('bookflow_email_accent_color', '#d4a853');
+        $accent_color = apply_filters('bookflow_email_accent_color', '#5b8fc7');
 
         $status_color = self::status_color($booking->status);
         $status_label = $is_admin ? Bookflow_I18n::status($booking->status) : Bookflow_I18n::status_locale($booking->status, $locale);
@@ -264,9 +264,9 @@ class Bookflow_Emails {
             <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#333;"><?php echo wp_kses_post($message); ?></p>
             <?php endif; ?>
 
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #e5e2db;border-radius:10px;overflow:hidden;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #dde3ec;border-radius:10px;overflow:hidden;">
                 <tr>
-                    <td style="background:#faf8f4;padding:16px 20px;border-bottom:1px solid #e5e2db;">
+                    <td style="background:#f5f7fa;padding:16px 20px;border-bottom:1px solid #dde3ec;">
                         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                             <tr>
                                 <td style="font-size:15px;font-weight:700;color:#1a1a1a;"><?php echo esc_html($product_name); ?></td>
@@ -281,10 +281,10 @@ class Bookflow_Emails {
                 </tr>
                 <?php foreach ($rows as $i => $row) : ?>
                 <tr>
-                    <td style="padding:12px 20px;<?php echo $i % 2 === 1 ? 'background:#fbfaf7;' : ''; ?><?php echo $i < count($rows) - 1 ? 'border-bottom:1px solid #f0eee8;' : ''; ?>">
+                    <td style="padding:12px 20px;<?php echo $i % 2 === 1 ? 'background:#f7f9fc;' : ''; ?><?php echo $i < count($rows) - 1 ? 'border-bottom:1px solid #e8ecf2;' : ''; ?>">
                         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                             <tr>
-                                <td style="font-size:13px;color:#8a8578;"><?php echo esc_html($row[0]); ?></td>
+                                <td style="font-size:13px;color:#7c8798;"><?php echo esc_html($row[0]); ?></td>
                                 <td align="right" style="font-size:14px;font-weight:600;color:#1a1a1a;"><?php echo esc_html($row[1]); ?></td>
                             </tr>
                         </table>
@@ -292,7 +292,7 @@ class Bookflow_Emails {
                 </tr>
                 <?php endforeach; ?>
                 <tr>
-                    <td style="padding:14px 20px;background:#1a1408;">
+                    <td style="padding:14px 20px;background:#10151f;">
                         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                             <tr>
                                 <td style="font-size:13px;font-weight:600;color:<?php echo esc_attr($accent_color); ?>;text-transform:uppercase;letter-spacing:.03em;"><?php echo esc_html($l('email.label.total')); ?></td>
@@ -307,7 +307,7 @@ class Bookflow_Emails {
             <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;">
                 <tr>
                     <td style="background:<?php echo esc_attr($accent_color); ?>;border-radius:6px;">
-                        <a href="<?php echo esc_url(admin_url('admin.php?page=bookflow-bookings&view=' . $booking->id)); ?>" style="display:inline-block;padding:12px 24px;color:#1a1408;font-size:14px;font-weight:700;text-decoration:none;">
+                        <a href="<?php echo esc_url(admin_url('admin.php?page=bookflow-bookings&view=' . $booking->id)); ?>" style="display:inline-block;padding:12px 24px;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;">
                             <?php echo esc_html(Bookflow_I18n::t('email.label.view_booking')); ?>
                         </a>
                     </td>
@@ -316,7 +316,7 @@ class Bookflow_Emails {
             <?php endif; ?>
 
             <?php if ($type === 'confirmation' || $type === 'paid' || $type === 'reminder') : ?>
-            <p style="margin:24px 0 0;color:#8a8578;font-size:13px;line-height:1.5;">
+            <p style="margin:24px 0 0;color:#7c8798;font-size:13px;line-height:1.5;">
                 <?php echo esc_html($l('email.label.contact_us')); ?>
             </p>
             <?php endif; ?>
@@ -329,8 +329,8 @@ class Bookflow_Emails {
         }
 
         // Fallback: generic wrapper using site identity, styled to match
-        // the plugin's own dark/gold visual language (booking widget,
-        // admin calendar) instead of a plain black bar.
+        // the plugin's own dark-navy/steel-blue visual language (booking
+        // widget, admin calendar) instead of a plain black bar.
         $site_name = esc_html(get_bloginfo('name'));
         $logo_id = get_theme_mod('custom_logo');
         $header_html = '<span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:.02em;">' . $site_name . '</span>';
@@ -342,15 +342,15 @@ class Bookflow_Emails {
         }
 
         return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>'
-            . '<body style="margin:0;padding:0;background:#f4f2ec;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">'
-            . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f2ec;padding:24px 12px;">'
+            . '<body style="margin:0;padding:0;background:#eef1f6;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">'
+            . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#eef1f6;padding:24px 12px;">'
             . '<tr><td align="center">'
             . '<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);">'
-            . '<tr><td style="background:#101010;padding:28px 32px;text-align:center;">' . $header_html . '</td></tr>'
+            . '<tr><td style="background:#10151f;padding:28px 32px;text-align:center;">' . $header_html . '</td></tr>'
             . '<tr><td style="height:3px;line-height:3px;font-size:0;background:' . esc_attr($accent_color) . ';">&nbsp;</td></tr>'
             . '<tr><td style="padding:32px;">' . $content . '</td></tr>'
-            . '<tr><td style="background:#101010;padding:20px 32px;text-align:center;">'
-            . '<span style="color:#8a8a8a;font-size:12px;">&copy; ' . gmdate('Y') . ' ' . $site_name . '</span>'
+            . '<tr><td style="background:#10151f;padding:20px 32px;text-align:center;">'
+            . '<span style="color:#9099ab;font-size:12px;">&copy; ' . gmdate('Y') . ' ' . $site_name . '</span>'
             . '</td></tr>'
             . '</table>'
             . '</td></tr>'

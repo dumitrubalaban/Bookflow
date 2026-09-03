@@ -31,12 +31,34 @@
     // synchronously below, before Svelte's reactive scheduler has run —
     // relying on the `allSteps` reactive value here would read undefined
     // on first render since $: statements resolve after plain `let` inits.
+    // Step order/visibility comes from the product's assigned Widget
+    // Builder preset (falls back to this hardcoded order if none is
+    // configured); 'staff' additionally requires the product to actually
+    // have resources, regardless of what the preset says, since a staff
+    // step with nothing to pick from can't be completed.
     function buildAllSteps(c) {
-        return ['language', 'location', 'day', ...(c.hasResources ? ['staff'] : []), 'time', 'persons', 'contact', 'confirm'];
+        const order = (c.widget && c.widget.steps && c.widget.steps.length)
+            ? c.widget.steps
+            : ['language', 'location', 'day', 'staff', 'time', 'persons', 'contact', 'confirm'];
+        return order.filter((step) => step !== 'staff' || !!c.hasResources);
     }
     function stepApplicable(step) {
         return step !== 'language' || !!cfg.hasSchedules;
     }
+
+    // === Widget Builder style (CSS custom properties on the widget root,
+    // overriding app.css's hardcoded defaults for this product only) ===
+    $: widgetStyle = cfg.widget && cfg.widget.style;
+    $: widgetStyleVars = widgetStyle
+        ? `--color-bf-accent:${widgetStyle.accent};--color-bf-accent-dark:${widgetStyle.accentDark};`
+        + `--color-bf-bg:${widgetStyle.bg};--color-bf-bg-alt:${widgetStyle.bgAlt};--color-bf-border:${widgetStyle.border};`
+        + (widgetStyle.maxWidth ? `max-width:${widgetStyle.maxWidth};margin-left:auto;margin-right:auto;` : '')
+        + (widgetStyle.fontFamily && widgetStyle.fontFamily !== 'inherit' ? `font-family:${widgetStyle.fontFamily};` : '')
+        : '';
+    $: widgetRadius = widgetStyle ? widgetStyle.radius + 'px' : '';
+    $: widgetPadding = widgetStyle && widgetStyle.padding ? widgetStyle.padding + 'px' : '';
+    $: widgetCustomClass = (widgetStyle && widgetStyle.customClass) || '';
+    $: widgetCustomCss = (widgetStyle && widgetStyle.customCss) || '';
     $: allSteps = buildAllSteps(cfg);
     $: visibleSteps = allSteps.filter(stepApplicable);
     $: stepLabels = {
@@ -97,7 +119,7 @@
             case 'time': return !!selectedSlot;
             case 'persons': return persons >= (parseInt(cfg.minPersons) || 1);
             case 'contact': return customerName.trim().length >= 3 && customerPhone.trim().length >= 6;
-            case 'confirm': return !hasTerms || termsAccepted;
+            case 'confirm': return (!hasTerms || termsAccepted) && (!hasGdpr || gdprAccepted);
             default: return true;
         }
     }
@@ -107,10 +129,10 @@
     // touches must also be named here or these two go stale (e.g. "Next"
     // staying disabled after typing a valid name/phone).
     $: formReady = (selectedSchedule, selectedDate, selectedResource, selectedSlot, persons,
-        personTypeQtys, customerName, customerPhone, termsAccepted, hasTerms, cfg,
+        personTypeQtys, customerName, customerPhone, termsAccepted, hasTerms, gdprAccepted, hasGdpr, cfg,
         allSteps.every(isStepComplete));
     $: currentStepComplete = (selectedSchedule, selectedDate, selectedResource, selectedSlot, persons,
-        personTypeQtys, customerName, customerPhone, termsAccepted, hasTerms, cfg,
+        personTypeQtys, customerName, customerPhone, termsAccepted, hasTerms, gdprAccepted, hasGdpr, cfg,
         isStepComplete(currentStep));
 
     // === Core selection state ===
@@ -404,6 +426,46 @@
         nextStep();
     }
 
+    // === Waiting list (for full slots) ===
+    let waitlistOpenFor = null; // the full slot object whose "Notify me" form is expanded
+    let waitlistName = '';
+    let waitlistEmail = '';
+    let waitlistPhone = '';
+    let waitlistHoneypot = '';
+    let waitlistSubmitting = false;
+    let waitlistDone = {}; // time -> true, once successfully joined
+    let waitlistError = '';
+
+    function toggleWaitlist(slot) {
+        waitlistOpenFor = waitlistOpenFor === slot.time ? null : slot.time;
+        waitlistError = '';
+    }
+    function submitWaitlist(slot) {
+        if (waitlistSubmitting || !waitlistName.trim() || !waitlistEmail.trim()) return;
+        waitlistSubmitting = true;
+        waitlistError = '';
+        ajax(cfg, 'bookflow_join_waitlist', {
+            product_id: cfg.productId,
+            date: selectedDate,
+            start_time: slot.time,
+            resource_id: selectedResource || '',
+            schedule_id: slotScheduleMap[slot.time] || selectedSchedule || '',
+            persons: persons,
+            name: waitlistName.trim(),
+            email: waitlistEmail.trim(),
+            phone: waitlistPhone.trim(),
+            bookflow_website: waitlistHoneypot,
+        }).then(() => {
+            waitlistSubmitting = false;
+            waitlistDone = { ...waitlistDone, [slot.time]: true };
+            waitlistOpenFor = null;
+            waitlistName = ''; waitlistEmail = ''; waitlistPhone = '';
+        }).catch((e) => {
+            waitlistSubmitting = false;
+            waitlistError = e.message === 'request_failed' ? (i18n.waitlistError || 'Could not join the waiting list. Please try again.') : e.message;
+        });
+    }
+
     // === Persons (types) step ===
     let personTypeQtys = []; // parallel to cfg.personTypes
     $: if (cfg.hasPersonTypes && personTypeQtys.length !== (cfg.personTypes || []).length) {
@@ -450,11 +512,44 @@
         }, 800);
     }
 
+    // === Spam protection: honeypot + optional reCAPTCHA v3 ===
+    // Bots that auto-fill every input on a form tend to fill this one too;
+    // real visitors never see it (visually hidden, not display:none so basic
+    // bots checking computed style still fill it, aria-hidden + tabindex -1
+    // so screen readers and keyboard nav skip it entirely).
+    let honeypot = '';
+    let recaptchaToken = '';
+    $: recaptchaEnabled = !!cfg.recaptchaSiteKey;
+    let recaptchaReady = false;
+    function loadRecaptcha() {
+        if (!recaptchaEnabled || recaptchaReady) return;
+        if (window.grecaptcha) { recaptchaReady = true; return; }
+        const s = document.createElement('script');
+        s.src = 'https://www.google.com/recaptcha/api.js?render=' + encodeURIComponent(cfg.recaptchaSiteKey);
+        s.async = true;
+        s.onload = () => { recaptchaReady = true; };
+        document.head.appendChild(s);
+    }
+    function getRecaptchaToken() {
+        if (!recaptchaEnabled || !window.grecaptcha) return Promise.resolve('');
+        return new Promise((resolve) => {
+            window.grecaptcha.ready(() => {
+                window.grecaptcha.execute(cfg.recaptchaSiteKey, { action: 'bookflow_booking' })
+                    .then(resolve).catch(() => resolve(''));
+            });
+        });
+    }
+
     // === Extras & terms ===
     let extrasChecked = {}; // id -> bool
     $: hasExtras = !!(cfg.extras && cfg.extras.length);
     $: hasTerms = !!cfg.termsText;
     let termsAccepted = false;
+    // GDPR consent is deliberately independent of the terms/waiver checkbox
+    // above: a product can have no terms text at all and still need consent
+    // for processing the customer's contact details.
+    $: hasGdpr = !!cfg.gdprText;
+    let gdprAccepted = false;
 
     // === Price ===
     let priceData = null; // { price_per_person_formatted, persons, total_formatted, deposit_amount_formatted, balance_due_formatted }
@@ -526,6 +621,7 @@
         touched = { name: true, phone: true };
         if (fieldState('name', customerName) !== 'valid' || fieldState('phone', customerPhone) !== 'valid') return 'contact';
         if (hasTerms && !termsAccepted) return 'confirm';
+        if (hasGdpr && !gdprAccepted) return 'confirm';
         return '';
     }
 
@@ -547,7 +643,12 @@
         if (selectedSchedule) checkData.schedule_id = selectedSchedule;
         if (selectedResource) checkData.resource_id = selectedResource;
 
-        ajax(cfg, 'bookflow_get_available_slots', checkData).then((res) => {
+        Promise.all([
+            ajax(cfg, 'bookflow_get_available_slots', checkData),
+            getRecaptchaToken(),
+        ]).then(async ([res, token]) => {
+            recaptchaToken = token;
+            await tick(); // flush the hidden recaptcha-token input before submit reads the DOM
             const stillAvailable = (res.slots || []).some((s) => s.time === selectedSlot && !s.is_full && s.available >= persons);
             submitLoading = false;
             if (stillAvailable) {
@@ -566,6 +667,7 @@
     onMount(() => {
         cartForm = root.closest('form.cart');
         if (cartForm) cartForm.addEventListener('submit', handleSubmit);
+        loadRecaptcha();
         // Legacy init() ends with goToStep(firstStep) so the initial step's
         // lazy data (locations/calendar/etc.) loads without waiting for a
         // user-triggered navigation; replicate that here.
@@ -580,8 +682,11 @@
      (`#bookflow-booking-form .class`), so this outer element must stay a
      bare id-only anchor and never itself carry a utility class, or that
      class silently never matches. -->
-<div bind:this={root} id="bookflow-booking-form" class="bookflow-wizard">
-<div class="relative w-full rounded-3xl border border-bf-border bg-gradient-to-b from-bf-bg-alt to-bf-bg p-6 sm:p-9 text-white shadow-2xl shadow-black/40">
+{#if widgetCustomCss}
+<svelte:element this={"style"}>{widgetCustomCss}</svelte:element>
+{/if}
+<div bind:this={root} id="bookflow-booking-form" class="bookflow-wizard {widgetCustomClass}" style={widgetStyleVars}>
+<div class="relative w-full border border-bf-border bg-gradient-to-b from-bf-bg-alt to-bf-bg p-6 sm:p-9 text-white shadow-2xl shadow-black/40" style:border-radius={widgetRadius} style:padding={widgetPadding ? `calc(1.5rem + ${widgetPadding})` : ''}>
 
     <Stepper steps={stepperItems} currentIndex={currentIndexVisible} onJump={goToStep} />
 
@@ -606,8 +711,17 @@
     <input type="hidden" name="bookflow_customer_name" value={customerName}>
     <input type="hidden" name="bookflow_customer_phone" value={customerPhone}>
     <input type="hidden" name="bookflow_notes" value={notes}>
+    <input type="hidden" name="bookflow_recaptcha_token" value={recaptchaToken}>
+    <!-- Honeypot: real users never see or reach this field (off-screen,
+         aria-hidden, unfocusable); bots that blanket-fill form inputs do. -->
+    <div style="position:absolute;left:-9999px;top:-9999px;" aria-hidden="true">
+        <input type="text" name="bookflow_website" tabindex="-1" autocomplete="off" bind:value={honeypot}>
+    </div>
     {#if hasTerms}
     <input type="hidden" name="bookflow_terms_accepted" value={termsAccepted ? '1' : ''}>
+    {/if}
+    {#if hasGdpr}
+    <input type="hidden" name="bookflow_gdpr_accepted" value={gdprAccepted ? '1' : ''}>
     {/if}
     {#each Object.keys(extrasChecked).filter((id) => extrasChecked[id]) as id (id)}
     <input type="hidden" name="bookflow_extras[]" value={id}>
@@ -760,8 +874,9 @@
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {#each slots as slot (slot.time)}
                     {@const selected = selectedSlot === slot.time}
+                    <div class={slot.is_full ? 'col-span-2 sm:col-span-3' : ''}>
                     <button type="button" disabled={slot.is_full} on:click={() => selectSlot(slot)}
-                            class="rounded-xl border px-4 py-3 text-center transition-all duration-150
+                            class="w-full rounded-xl border px-4 py-3 text-center transition-all duration-150
                                 {slot.is_full ? 'border-bf-border/50 text-white/25 cursor-not-allowed' : 'hover:border-bf-accent/50 hover:-translate-y-0.5'}
                                 {selected ? 'border-bf-accent bg-bf-accent/10 shadow-md shadow-bf-accent/10' : 'border-bf-border bg-bf-bg-alt'}">
                         <span class="block font-semibold {selected ? 'text-bf-accent' : ''}">{slot.time}</span>
@@ -769,6 +884,36 @@
                             {slot.is_full ? (i18n.soldOut || 'Sold out') : (i18n.spotsOfMax || '%d of %d available').replace('%d', slot.available).replace('%d', slot.max_persons)}
                         </span>
                     </button>
+                    {#if slot.is_full}
+                        {#if waitlistDone[slot.time]}
+                        <p class="mt-1.5 text-center text-xs text-bf-accent">{i18n.waitlistSuccess}</p>
+                        {:else}
+                        <button type="button" on:click={() => toggleWaitlist(slot)}
+                                class="mt-1.5 w-full text-center text-xs font-medium text-bf-accent underline-offset-2 hover:underline">
+                            {i18n.notifyMe}
+                        </button>
+                        {#if waitlistOpenFor === slot.time}
+                        <div class="mt-2 space-y-2 rounded-xl border border-bf-border bg-bf-bg-alt p-3">
+                            <div style="position:absolute;left:-9999px;" aria-hidden="true">
+                                <input type="text" tabindex="-1" autocomplete="off" bind:value={waitlistHoneypot}>
+                            </div>
+                            <input type="text" placeholder={i18n.waitlistNameLabel} bind:value={waitlistName}
+                                   class="w-full rounded-lg border border-bf-border bg-bf-bg px-3 py-2 text-sm text-white placeholder:text-white/30">
+                            <input type="email" placeholder={i18n.waitlistEmailLabel} bind:value={waitlistEmail}
+                                   class="w-full rounded-lg border border-bf-border bg-bf-bg px-3 py-2 text-sm text-white placeholder:text-white/30">
+                            <input type="tel" placeholder={i18n.waitlistPhoneLabel} bind:value={waitlistPhone}
+                                   class="w-full rounded-lg border border-bf-border bg-bf-bg px-3 py-2 text-sm text-white placeholder:text-white/30">
+                            {#if waitlistError}<p class="text-xs text-red-400">{waitlistError}</p>{/if}
+                            <button type="button" disabled={waitlistSubmitting || !waitlistName.trim() || !waitlistEmail.trim()}
+                                    on:click={() => submitWaitlist(slot)}
+                                    class="w-full rounded-lg bg-bf-accent px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-bf-accent-dark disabled:opacity-40">
+                                {i18n.waitlistSubmit}
+                            </button>
+                        </div>
+                        {/if}
+                        {/if}
+                    {/if}
+                    </div>
                     {/each}
                 </div>
             {/if}
@@ -914,6 +1059,22 @@
                     <Check size={13} strokeWidth={3.5} class="text-white opacity-0 transition-opacity group-data-[state=checked]:opacity-100" />
                 </Checkbox.Root>
                 <span class="text-sm text-white/90">{i18n.termsAgree}</span>
+            </label>
+        </div>
+        {/if}
+
+        {#if hasGdpr}
+        <div class="mt-4">
+            <p class="mb-3 rounded-xl border border-bf-border bg-bf-bg-alt p-4 text-sm text-white/55">{cfg.gdprText}</p>
+            <label class="flex cursor-pointer items-center gap-3">
+                <Checkbox.Root
+                    checked={gdprAccepted}
+                    onCheckedChange={(v) => gdprAccepted = v}
+                    class="group flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-bf-border transition-colors data-[state=checked]:border-bf-accent data-[state=checked]:bg-bf-accent"
+                >
+                    <Check size={13} strokeWidth={3.5} class="text-white opacity-0 transition-opacity group-data-[state=checked]:opacity-100" />
+                </Checkbox.Root>
+                <span class="text-sm text-white/90">{i18n.gdprAgree}</span>
             </label>
         </div>
         {/if}

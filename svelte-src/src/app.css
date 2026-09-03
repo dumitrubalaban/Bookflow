@@ -19,11 +19,21 @@
 }
 
 @theme {
-    --color-bf-accent: #c9a24b;
-    --color-bf-accent-dark: #a9832f;
-    --color-bf-bg: #101010;
-    --color-bf-bg-alt: #1a1a1a;
-    --color-bf-border: #2e2e2e;
+    /* Deep navy + steel-blue — the *customer-facing widget's* default look
+       (Widget Builder will make this configurable per-widget; these stay
+       as the fallback for a widget with no saved style). */
+    --color-bf-accent: #5b8fc7;
+    --color-bf-accent-dark: #3f6c9e;
+    --color-bf-bg: #10151f;
+    --color-bf-bg-alt: #1a2233;
+    --color-bf-border: #2a3448;
+
+    /* Admin screens intentionally do NOT reuse the widget's theme — they
+       stay plain WordPress admin (white panels, WP's own blue) so the
+       plugin's back-office feels native rather than like a themed skin.
+       Same hex values wp-admin itself uses for its primary button/link blue. */
+    --color-bf-admin-accent: #2271b1;
+    --color-bf-admin-accent-dark: #135e96;
 }
 
 /* Inside a flex container, `width: auto` on these icon <svg> elements

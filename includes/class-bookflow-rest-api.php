@@ -860,11 +860,31 @@ class Bookflow_REST_API {
             $by_status[$status] = Bookflow_Booking::count(array_merge($args, ['status' => $status]));
         }
 
+        $by_day = array_map(function ($row) {
+            return [
+                'date'     => $row->date,
+                'revenue'  => (float) $row->revenue,
+                'bookings' => (int) $row->bookings,
+            ];
+        }, Bookflow_Booking::get_revenue_by_day($args));
+
+        $by_product = array_map(function ($row) {
+            $product = wc_get_product($row->product_id);
+            return [
+                'product_id' => (int) $row->product_id,
+                'name'       => $product ? $product->get_name() : Bookflow_I18n::t('admin.deleted_product'),
+                'revenue'    => (float) $row->revenue,
+                'bookings'   => (int) $row->bookings,
+            ];
+        }, Bookflow_Booking::get_revenue_by_product($args));
+
         return rest_ensure_response([
             'revenue'        => (float) $revenue->total_revenue,
             'total_bookings' => (int) $revenue->total_bookings,
             'total_persons'  => (int) $revenue->total_persons,
             'by_status'      => $by_status,
+            'by_day'         => $by_day,
+            'by_product'     => $by_product,
         ]);
     }
 
@@ -947,7 +967,13 @@ class Bookflow_REST_API {
             'resource_id'    => ['type' => 'integer'],
             'schedule_id'    => ['type' => 'integer'],
             'customer_name'  => ['type' => 'string'],
-            'customer_email' => ['type' => 'string', 'format' => 'email'],
+            // No 'format' => 'email' here: WP's built-in schema validation
+            // rejects a blank string as an "invalid email" too (not just a
+            // malformed one), which made this optional field impossible to
+            // actually omit. The handler already runs sanitize_email() on
+            // whatever is submitted, so validation isn't lost, just no
+            // longer wrongly mandatory.
+            'customer_email' => ['type' => 'string'],
             'customer_phone' => ['type' => 'string'],
             'notes'          => ['type' => 'string'],
             'status'         => ['type' => 'string', 'default' => 'pending'],

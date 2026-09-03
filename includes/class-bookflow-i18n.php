@@ -64,6 +64,15 @@ class Bookflow_I18n {
     }
 
     /**
+     * The resolved locale for the current request (e.g. 'ro_RO') — used by
+     * the Widget Builder's per-locale text overrides to know which
+     * override set to merge in.
+     */
+    public static function current_locale() {
+        return self::$locale;
+    }
+
+    /**
      * Echo an escaped translation.
      */
     public static function te($key, ...$args) {

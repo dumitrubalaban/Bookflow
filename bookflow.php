@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 define('BOOKFLOW_VERSION', '1.0.0');
-define('BOOKFLOW_DB_VERSION', '1.8.0');
+define('BOOKFLOW_DB_VERSION', '1.12.0');
 define('BOOKFLOW_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('BOOKFLOW_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('BOOKFLOW_PLUGIN_FILE', __FILE__);
@@ -81,6 +81,7 @@ function bookflow_init() {
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-logger.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-cache.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-rate-limit.php';
+    require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-spam.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-product-type.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-booking.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-resources.php';
@@ -88,7 +89,10 @@ function bookflow_init() {
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-vouchers.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-ratings.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-abandoned.php';
+    require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-waitlist.php';
+    require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-webhooks.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-locations.php';
+    require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-widgets.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-schedules.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-person-types.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-availability.php';
@@ -104,16 +108,39 @@ function bookflow_init() {
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-google-calendar.php';
 
     // Admin
+    // Submenu order under the top-level "Bookflow" menu follows the order
+    // these classes are instantiated here — each hooks its own
+    // add_submenu_page() call onto 'admin_menu', and same-priority hooks
+    // fire in registration order. Grouped by how often a merchant actually
+    // reaches for each page: daily-use views first (Calendar, the Widget
+    // Builder), then insight (Reports), then the setup/config entities a
+    // widget's product depends on, then integrations, then the
+    // least-frequently-touched utilities (Export/Import) last.
     if (is_admin()) {
         require_once BOOKFLOW_PLUGIN_DIR . 'admin/class-bookflow-bookings-list-table.php';
+        require_once BOOKFLOW_PLUGIN_DIR . 'admin/class-bookflow-widgets-list-table.php';
         require_once BOOKFLOW_PLUGIN_DIR . 'admin/class-bookflow-admin.php';
         require_once BOOKFLOW_PLUGIN_DIR . 'admin/class-bookflow-admin-calendar.php';
-        require_once BOOKFLOW_PLUGIN_DIR . 'admin/class-bookflow-export.php';
-        require_once BOOKFLOW_PLUGIN_DIR . 'admin/class-bookflow-import.php';
+        require_once BOOKFLOW_PLUGIN_DIR . 'admin/class-bookflow-admin-reports.php';
         new Bookflow_Admin();
         new Bookflow_Admin_Calendar();
-        new Bookflow_Export();
-        new Bookflow_Import();
+    }
+    // Unlike Resources/Locations/Schedules/Extras below (admin_menu +
+    // wp_ajax_ only — safe to gate behind is_admin()), Bookflow_Widgets
+    // also registers the `[bookflow_widget]` shortcode and the
+    // bookflow_booking_created/status_changed hooks that fire real
+    // webhooks during checkout — both needed on ordinary frontend/REST
+    // requests, so this must construct unconditionally. Positioned here,
+    // between Admin_Calendar and Admin_Reports' own construction, purely
+    // so its submenu item lands in the right position in the sidebar when
+    // a request IS in wp-admin.
+    new Bookflow_Widgets();
+    if (is_admin()) {
+        new Bookflow_Admin_Reports();
+        new Bookflow_Resources();
+        new Bookflow_Locations();
+        new Bookflow_Schedules();
+        new Bookflow_Extras();
     }
 
     // Frontend
@@ -123,13 +150,11 @@ function bookflow_init() {
     Bookflow_Logger::init();
     Bookflow_Cache::init();
     new Bookflow_Product_Type();
-    new Bookflow_Resources();
-    new Bookflow_Extras();
     new Bookflow_Vouchers();
     new Bookflow_Ratings();
     new Bookflow_Abandoned();
-    new Bookflow_Locations();
-    new Bookflow_Schedules();
+    new Bookflow_Waitlist();
+    new Bookflow_Webhooks();
     new Bookflow_Person_Types();
     new Bookflow_Cart();
     new Bookflow_Ajax();
@@ -140,6 +165,15 @@ function bookflow_init() {
     Bookflow_iCal::init();
     Bookflow_PingMe::init();
     Bookflow_Google_Calendar::init();
+
+    // Export/Import: least-frequently-used admin utilities, deliberately
+    // registered last so their submenu items land at the bottom.
+    if (is_admin()) {
+        require_once BOOKFLOW_PLUGIN_DIR . 'admin/class-bookflow-export.php';
+        require_once BOOKFLOW_PLUGIN_DIR . 'admin/class-bookflow-import.php';
+        new Bookflow_Export();
+        new Bookflow_Import();
+    }
 
     // REST API loads on rest_api_init
     add_action('rest_api_init', function () {
@@ -415,6 +449,28 @@ function bookflow_create_tables() {
         KEY recovered (recovered)
     ) $charset_collate;");
 
+    // Waiting list — customers who asked to be notified when a full slot
+    // opens back up (via cancellation).
+    dbDelta("CREATE TABLE {$wpdb->prefix}bookflow_waitlist (
+        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+        product_id bigint(20) unsigned NOT NULL,
+        resource_id bigint(20) unsigned DEFAULT NULL,
+        schedule_id bigint(20) unsigned DEFAULT NULL,
+        booking_date date NOT NULL,
+        start_time time NOT NULL,
+        persons_requested int(11) NOT NULL DEFAULT 1,
+        customer_name varchar(255) NOT NULL,
+        customer_email varchar(255) NOT NULL,
+        customer_phone varchar(50) DEFAULT NULL,
+        status varchar(20) NOT NULL DEFAULT 'waiting',
+        created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        notified_at datetime DEFAULT NULL,
+        PRIMARY KEY (id),
+        KEY product_id (product_id),
+        KEY slot_lookup (product_id, booking_date, start_time, status),
+        KEY status (status)
+    ) $charset_collate;");
+
     // Audit log
     dbDelta("CREATE TABLE {$wpdb->prefix}bookflow_log (
         id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -430,6 +486,25 @@ function bookflow_create_tables() {
         KEY booking_id (booking_id),
         KEY action (action),
         KEY created_at (created_at)
+    ) $charset_collate;");
+
+    // Widget Builder: reusable widget presets (style + wizard step flow),
+    // assignable per-product so different products can use different
+    // looks/flows instead of one hardcoded global widget style.
+    dbDelta("CREATE TABLE {$wpdb->prefix}bookflow_widgets (
+        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+        name varchar(255) NOT NULL,
+        product_id bigint(20) unsigned DEFAULT NULL,
+        style text DEFAULT NULL,
+        steps text DEFAULT NULL,
+        text longtext DEFAULT NULL,
+        webhook_url varchar(500) DEFAULT NULL,
+        is_default tinyint(1) NOT NULL DEFAULT 0,
+        created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY product_id (product_id),
+        KEY is_default (is_default)
     ) $charset_collate;");
 
     update_option('bookflow_db_version', BOOKFLOW_DB_VERSION);

@@ -236,9 +236,18 @@ class Bookflow_Availability {
             return $result;
         }
 
-        // Check resource availability
+        // Resource existence/active check only — capacity is deliberately
+        // NOT checked here (that's what Bookflow_Resources::is_resource_available()
+        // is for, and other callers like the "choose your guide" step still
+        // want that full has-room check). A resource merely being at
+        // capacity must still fall through to the booked_persons/max_persons
+        // comparison below so a fully-booked resource slot comes back
+        // structurally offered (and thus visible as "sold out", with a
+        // waitlist option) instead of silently vanishing from the slot list.
+        $resource = null;
         if ($resource_id) {
-            if (!Bookflow_Resources::is_resource_available($resource_id, $product_id, $date, $start_time)) {
+            $resource = Bookflow_Resources::get($resource_id);
+            if (!$resource || $resource->status !== 'active') {
                 return $result;
             }
         }
@@ -273,6 +282,12 @@ class Bookflow_Availability {
             if ($schedule->max_persons > 0) {
                 $max_persons = (int) $schedule->max_persons;
             }
+        }
+
+        // A resource can't host more people than its own capacity, even if
+        // the product/schedule would otherwise allow more.
+        if ($resource) {
+            $max_persons = min($max_persons, (int) $resource->capacity);
         }
 
         $result['structurally_offered'] = true;

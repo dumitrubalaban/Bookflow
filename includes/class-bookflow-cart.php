@@ -46,6 +46,8 @@ class Bookflow_Cart {
         $hidden[] = '_bookflow_location_tag';
         $hidden[] = '_bookflow_terms_accepted';
         $hidden[] = '_bookflow_terms_accepted_at';
+        $hidden[] = '_bookflow_gdpr_accepted';
+        $hidden[] = '_bookflow_gdpr_accepted_at';
         $hidden[] = '_bookflow_extras';
         $hidden[] = '_bookflow_full_total';
         $hidden[] = '_bookflow_deposit_amount';
@@ -60,6 +62,14 @@ class Bookflow_Cart {
         $product = wc_get_product($product_id);
         if (!$product || $product->get_type() !== 'booking') {
             return $valid;
+        }
+
+        if (!Bookflow_Spam::is_human()) {
+            // Deliberately the same generic message a real validation failure
+            // would show — telling a bot exactly why it was blocked only
+            // helps it adapt.
+            wc_add_notice(Bookflow_I18n::t('error.select_date_and_time'), 'error');
+            return false;
         }
 
         $date = sanitize_text_field(wp_unslash($_POST['bookflow_booking_date'] ?? ''));
@@ -91,6 +101,11 @@ class Bookflow_Cart {
 
         if (get_post_meta($product_id, '_bookflow_terms_text', true) && empty($_POST['bookflow_terms_accepted'])) {
             wc_add_notice(Bookflow_I18n::t('form.error_terms'), 'error');
+            return false;
+        }
+
+        if (apply_filters('bookflow_gdpr_consent_text', '') && empty($_POST['bookflow_gdpr_accepted'])) {
+            wc_add_notice(Bookflow_I18n::t('form.error_gdpr'), 'error');
             return false;
         }
 
@@ -162,6 +177,14 @@ class Bookflow_Cart {
         if (get_post_meta($product_id, '_bookflow_terms_text', true)) {
             $cart_item_data['bookflow_terms_accepted'] = !empty($_POST['bookflow_terms_accepted']);
             $cart_item_data['bookflow_terms_accepted_at'] = current_time('mysql');
+        }
+
+        // GDPR data-processing consent — site-wide (via filter), independent
+        // of the per-product terms waiver above. Recorded with a timestamp
+        // for the same audit-trail reason as the terms waiver.
+        if (apply_filters('bookflow_gdpr_consent_text', '')) {
+            $cart_item_data['bookflow_gdpr_accepted'] = !empty($_POST['bookflow_gdpr_accepted']);
+            $cart_item_data['bookflow_gdpr_accepted_at'] = current_time('mysql');
         }
 
         // Tour language (from schedule selection)
@@ -337,6 +360,10 @@ class Bookflow_Cart {
         if (isset($values['bookflow_terms_accepted'])) {
             $item->add_meta_data('_bookflow_terms_accepted', $values['bookflow_terms_accepted'] ? 'yes' : 'no');
             $item->add_meta_data('_bookflow_terms_accepted_at', $values['bookflow_terms_accepted_at'] ?? '');
+        }
+        if (isset($values['bookflow_gdpr_accepted'])) {
+            $item->add_meta_data('_bookflow_gdpr_accepted', $values['bookflow_gdpr_accepted'] ? 'yes' : 'no');
+            $item->add_meta_data('_bookflow_gdpr_accepted_at', $values['bookflow_gdpr_accepted_at'] ?? '');
         }
         if (!empty($values['bookflow_extras'])) {
             $item->add_meta_data(Bookflow_I18n::t('cart.extras'), implode(', ', wp_list_pluck($values['bookflow_extras'], 'title')));

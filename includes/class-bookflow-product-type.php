@@ -319,6 +319,14 @@ class Bookflow_Product_Type {
         echo '</select></p>';
         echo '</div>';
 
+        $owning_widget = Bookflow_Widgets::get_by_product_id($product_id);
+        if ($owning_widget) {
+            echo '<div class="options_group">';
+            echo '<h4 style="padding-left:12px;">' . esc_html(Bookflow_I18n::t('admin.widget_builder')) . '</h4>';
+            echo '<p style="padding-left:12px;" class="description">' . esc_html(sprintf(Bookflow_I18n::t('product.managed_by_widget'), $owning_widget->name)) . ' <a href="' . esc_url(admin_url('admin.php?page=bookflow-widgets')) . '">' . esc_html(Bookflow_I18n::t('admin.widget_builder')) . '</a></p>';
+            echo '</div>';
+        }
+
         echo '<div class="options_group">';
         echo '<h4 style="padding-left:12px;">' . esc_html(Bookflow_I18n::t('product.terms_title')) . '</h4>';
         echo '<p style="padding-left:12px;" class="description">' . esc_html(Bookflow_I18n::t('product.terms_desc')) . '</p>';

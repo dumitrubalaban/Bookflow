@@ -20,8 +20,11 @@ class Bookflow_iCal {
         add_action('rest_api_init', [__CLASS__, 'register_routes']);
         // Attach .ics to outgoing booking emails
         add_filter('bookflow_email_attachments', [__CLASS__, 'email_attachment'], 10, 2);
-        // Show the subscribe URL on the bookings admin page
-        add_action('admin_notices', [__CLASS__, 'admin_panel']);
+        // The "Calendar sync" banner (admin_panel(), still defined below)
+        // used to auto-print at the top of the Bookings list on every
+        // visit — dropped as unwanted clutter. The feed itself, and
+        // regenerating its token, still work the same; there's just no
+        // standing announcement for it anymore.
         add_action('admin_post_bookflow_regen_ical', [__CLASS__, 'handle_regen']);
     }
 
@@ -31,6 +34,13 @@ class Bookflow_iCal {
     public static function admin_panel() {
         $screen = get_current_screen();
         if (!$screen || strpos($screen->id, 'bookflow-bookings') === false) {
+            return;
+        }
+        // Only the list screen, not a single booking's detail view (same
+        // screen id for both, since WP's screen id doesn't vary with the
+        // `view` query arg) — the subscribe link is about every booking,
+        // so it reads as out of place pinned above one specific booking.
+        if (!empty($_GET['view'])) {
             return;
         }
         $url = self::feed_url();

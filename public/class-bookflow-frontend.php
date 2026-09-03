@@ -11,7 +11,17 @@ if (!defined('ABSPATH')) {
 
 class Bookflow_Frontend {
 
+    /** @var self|null Set in the constructor so the [bookflow_widget]
+     * shortcode handler (a different class) can reach render_for_product()
+     * without WordPress offering a service container to inject it through. */
+    private static $instance = null;
+
+    public static function instance() {
+        return self::$instance;
+    }
+
     public function __construct() {
+        self::$instance = $this;
         add_action('wp_enqueue_scripts', [$this, 'enqueue_scripts']);
         add_action('woocommerce_before_add_to_cart_button', [$this, 'booking_form'], 20);
         // WooCommerce only auto-renders the add-to-cart area for its own
@@ -83,6 +93,18 @@ class Bookflow_Frontend {
             return;
         }
 
+        $this->enqueue_for_product($product);
+    }
+
+    /**
+     * Shared by the automatic product-page render and the `[bookflow_widget]`
+     * shortcode — takes an explicit product instead of reading the `$post`
+     * global, so it works equally on a product's own page and anywhere
+     * else the shortcode is placed.
+     */
+    public function enqueue_for_product($product) {
+        $product_id = $product->get_id();
+
         // Lets a separate front-end plugin (a custom widget/skin) replace
         // this built-in form entirely, so the two never render side by side.
         if (!apply_filters('bookflow_render_default_widget', true, $product)) {
@@ -110,11 +132,11 @@ class Bookflow_Frontend {
         }
         $script_handle = $using_svelte ? 'bookflow-widget' : 'bookflow-booking';
 
-        $has_person_types = Bookflow_Person_Types::product_has_types($post->ID);
-        $person_types = $has_person_types ? Bookflow_Person_Types::get_for_product($post->ID) : [];
+        $has_person_types = Bookflow_Person_Types::product_has_types($product_id);
+        $person_types = $has_person_types ? Bookflow_Person_Types::get_for_product($product_id) : [];
         $has_resources = $product->has_resources();
-        $has_schedules = Bookflow_Schedules::product_has_schedules($post->ID);
-        $schedules = $has_schedules ? Bookflow_Schedules::get_for_product($post->ID) : [];
+        $has_schedules = Bookflow_Schedules::product_has_schedules($product_id);
+        $schedules = $has_schedules ? Bookflow_Schedules::get_for_product($product_id) : [];
 
         $person_types_data = array_map(function ($pt) {
             return [
@@ -127,9 +149,9 @@ class Bookflow_Frontend {
             ];
         }, $person_types);
 
-        $loc_terms = get_the_terms($post->ID, 'product_tag');
+        $loc_terms = get_the_terms($product_id, 'product_tag');
         $current_location = (!empty($loc_terms) && !is_wp_error($loc_terms)) ? current($loc_terms)->slug : null;
-        $current_location_id = (int) get_post_meta($post->ID, '_bookflow_location_id', true) ?: null;
+        $current_location_id = (int) get_post_meta($product_id, '_bookflow_location_id', true) ?: null;
 
         $schedules_data = array_map(function ($s) {
             return [
@@ -144,14 +166,16 @@ class Bookflow_Frontend {
             ];
         }, $schedules);
 
-        wp_localize_script($script_handle, 'bookflowBooking', [
+        $widget_config = Bookflow_Widgets::resolve_for_product($product_id);
+
+        $localize_data = [
             'ajaxUrl'         => admin_url('admin-ajax.php'),
             'nonce'           => wp_create_nonce('bookflow_nonce'),
             'restUrl'         => esc_url_raw(rest_url('bookflow/v1/')),
             'restNonce'       => wp_create_nonce('wp_rest'),
             'currentLocation' => $current_location,
             'currentLocationId' => $current_location_id,
-            'productId'       => $post->ID,
+            'productId'       => $product_id,
             'minPersons'      => $product->get_min_persons(),
             'maxPersons'      => $product->get_max_persons(),
             'currency'        => get_woocommerce_currency_symbol(),
@@ -160,7 +184,7 @@ class Bookflow_Frontend {
             'hasResources'    => $has_resources,
             'hasSchedules'    => $has_schedules,
             'schedules'       => $schedules_data,
-            'termsText'       => get_post_meta($post->ID, '_bookflow_terms_text', true),
+            'termsText'       => get_post_meta($product_id, '_bookflow_terms_text', true),
             'addToCartText'   => $product->single_add_to_cart_text(),
             'extras'          => array_map(function ($ex) {
                 return [
@@ -235,12 +259,77 @@ class Bookflow_Frontend {
                 'termsAgree'      => Bookflow_I18n::t('form.terms_agree'),
                 'depositPaidNow'  => Bookflow_I18n::t('cart.deposit_paid_now'),
                 'balanceDue'      => Bookflow_I18n::t('cart.balance_due'),
+                'gdprAgree'       => Bookflow_I18n::t('form.gdpr_agree'),
+                'errorGdpr'       => Bookflow_I18n::t('form.error_gdpr'),
+                'notifyMe'        => Bookflow_I18n::t('calendar.notify_me'),
+                'waitlistNameLabel'  => Bookflow_I18n::t('calendar.waitlist_name'),
+                'waitlistEmailLabel' => Bookflow_I18n::t('calendar.waitlist_email'),
+                'waitlistPhoneLabel' => Bookflow_I18n::t('calendar.waitlist_phone'),
+                'waitlistSubmit'  => Bookflow_I18n::t('calendar.waitlist_submit'),
+                'waitlistSuccess' => Bookflow_I18n::t('calendar.waitlist_success'),
+                'waitlistError'   => Bookflow_I18n::t('calendar.waitlist_error'),
             ],
             'languageSelector' => apply_filters('bookflow_language_selector_id', 'bookflow-language'),
             'langDropdown'     => apply_filters('bookflow_lang_dropdown_id', 'bookflow-lang-select'),
             'spotsElement'     => apply_filters('bookflow_spots_element_id', 'bookflow-spots-left'),
-            'souvenirPrice'    => (float) (function_exists('get_field') ? get_field('excursii_souvenir_price', $post->ID) : 0),
-        ]);
+            'souvenirPrice'    => (float) (function_exists('get_field') ? get_field('excursii_souvenir_price', $product_id) : 0),
+            // Empty by default: reCAPTCHA v3 only activates once a site owner
+            // wires both filters to real Google keys, keeping it opt-in.
+            'recaptchaSiteKey' => apply_filters('bookflow_recaptcha_site_key', ''),
+            // Separate from the per-product terms/liability-waiver checkbox
+            // above: this is a site-wide data-processing consent, off by
+            // default until a site owner supplies their own wording (their
+            // privacy policy differs per site, so no sensible default text
+            // exists to ship).
+            'gdprText'         => apply_filters('bookflow_gdpr_consent_text', ''),
+            // Widget Builder: this product's assigned preset (or the site
+            // default, or the hardcoded fallback) — drives the widget's
+            // CSS custom properties and which wizard steps render, and in
+            // what order, so different products can look/flow differently.
+            'widget'           => $widget_config,
+        ];
+
+        // Per-widget, per-locale text overrides win over the site's own
+        // translation for any key the merchant actually filled in — merged
+        // here (server-side, already resolved to the request's locale by
+        // resolve_for_product()) so the client never needs its own
+        // per-locale override lookup.
+        if (!empty($widget_config['text'])) {
+            $localize_data['i18n'] = array_merge($localize_data['i18n'], $widget_config['text']);
+        }
+
+        wp_localize_script($script_handle, 'bookflowBooking', $localize_data);
+    }
+
+    /**
+     * Renders this product's booking form as a standalone string, for the
+     * `[bookflow_widget]` shortcode — usable on any page/post, not just the
+     * product's own page. `add_to_cart_template()` reads `global $product`
+     * (it's normally invoked from inside WooCommerce's own product-page
+     * loop, where that global is already set), so it's swapped in/out
+     * around the call rather than threading a parameter through every
+     * hooked callback in between.
+     */
+    public function render_for_product($product) {
+        if (!$product || $product->get_type() !== 'booking') {
+            return '';
+        }
+        $this->enqueue_for_product($product);
+
+        global $post;
+        $previous_product = $GLOBALS['product'] ?? null;
+        $previous_post = $post;
+        $GLOBALS['product'] = $product;
+        $post = get_post($product->get_id());
+
+        ob_start();
+        $this->add_to_cart_template();
+        $html = ob_get_clean();
+
+        $GLOBALS['product'] = $previous_product;
+        $post = $previous_post;
+
+        return $html;
     }
 
     public function booking_form() {

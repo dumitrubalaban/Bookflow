@@ -20,12 +20,27 @@ class Bookflow_Admin {
     public function add_admin_menu() {
         $hook = add_menu_page(
             Bookflow_I18n::t('admin.bookings'),
-            Bookflow_I18n::t('admin.bookings'),
+            // The sidebar's top-level label is the plugin/brand name (like
+            // "WooCommerce" or "Yoast SEO" do), not translated — it's an
+            // identifier for which plugin's menu this is, not UI copy.
+            'Bookflow',
             'manage_woocommerce',
             'bookflow-bookings',
             [$this, 'bookings_page'],
             'dashicons-calendar-alt',
             56
+        );
+        // add_menu_page() auto-adds a first submenu item that mirrors the
+        // *menu* title (now "Bookflow") rather than the page title
+        // ("Bookings") — without this, the first submenu row would
+        // redundantly repeat the top-level "Bookflow" label instead of
+        // naming what the page actually shows.
+        add_submenu_page(
+            'bookflow-bookings',
+            Bookflow_I18n::t('admin.bookings'),
+            Bookflow_I18n::t('admin.bookings'),
+            'manage_woocommerce',
+            'bookflow-bookings'
         );
         add_action("load-$hook", [$this, 'screen_options']);
         add_filter("manage_{$hook}_columns", function () {
@@ -322,14 +337,14 @@ class Bookflow_Admin {
                     <div class="postbox">
                         <h2 class="hndle" style="padding:10px 15px; margin:0;"><?php Bookflow_I18n::te('admin.activity_log'); ?></h2>
                         <div class="inside" style="padding:15px; max-height:300px; overflow-y:auto;">
-                            <?php foreach ($logs as $log) : ?>
+                            <?php foreach ($logs as $log) : $entry = $this->format_log_entry($log); ?>
                                 <div style="border-bottom:1px solid #eee; padding:8px 0; font-size:13px;">
-                                    <strong><?php echo esc_html($log->action); ?></strong>
-                                    <?php if ($log->new_value) : ?>
-                                        <span style="color:#666;">&rarr; <?php echo esc_html($log->new_value); ?></span>
+                                    <strong><?php echo esc_html($entry['label']); ?></strong>
+                                    <?php if ($entry['detail']) : ?>
+                                        <div style="color:#666; margin-top:2px;"><?php echo wp_kses_post($entry['detail']); ?></div>
                                     <?php endif; ?>
-                                    <?php if ($log->note) : ?>
-                                        <br><em style="color:#888;"><?php echo esc_html($log->note); ?></em>
+                                    <?php if ($entry['note']) : ?>
+                                        <br><em style="color:#888;"><?php echo esc_html($entry['note']); ?></em>
                                     <?php endif; ?>
                                     <br><small style="color:#999;"><?php echo esc_html($log->created_at); ?>
                                         <?php if ($log->user_id) : ?>
@@ -406,5 +421,91 @@ class Bookflow_Admin {
             </div>
         </div>
         <?php
+    }
+
+    /**
+     * Turn one raw bookflow_log row into a human-readable Activity Log
+     * entry. old_value/new_value are stored as JSON (Bookflow_Logger::log()
+     * — full booking snapshots for create, raw diffs for update) so they
+     * can support real auditing later, but dumping that JSON straight into
+     * the page read like a debug console rather than an admin feature —
+     * this renders the same data as plain sentences instead.
+     *
+     * @return array{label: string, detail: string, note: string}
+     */
+    private function format_log_entry($log) {
+        // Fields worth showing in an update diff, mapped to an existing
+        // i18n label — internal/system-only columns (rating_token,
+        // google_calendar_event_id, customer_locale, schedule_id, ids)
+        // are deliberately left out as noise no admin needs to audit.
+        $field_labels = [
+            'booking_date'    => Bookflow_I18n::t('admin.date'),
+            'start_time'      => Bookflow_I18n::t('admin.time'),
+            'persons_total'   => Bookflow_I18n::t('admin.persons'),
+            'cost'            => Bookflow_I18n::t('admin.total'),
+            'customer_name'   => Bookflow_I18n::t('admin.name'),
+            'customer_email'  => Bookflow_I18n::t('admin.email'),
+            'customer_phone'  => Bookflow_I18n::t('form.phone'),
+            'notes'           => Bookflow_I18n::t('admin.customer_notes'),
+            'internal_notes'  => Bookflow_I18n::t('admin.internal_notes'),
+            'cancellation_reason' => Bookflow_I18n::t('admin.cancelled'),
+            'resource_id'     => Bookflow_I18n::t('admin.product'),
+        ];
+
+        $new = $log->new_value ? json_decode($log->new_value, true) : null;
+        $old = $log->old_value ? json_decode($log->old_value, true) : null;
+        $note = $log->note ?: '';
+        $detail = '';
+
+        switch ($log->action) {
+            case 'booking_created':
+                $label = Bookflow_I18n::t('admin.booking_created');
+                break;
+
+            case 'booking_updated':
+                $label = Bookflow_I18n::t('admin.booking_updated');
+                if (is_array($new)) {
+                    $lines = [];
+                    foreach ($field_labels as $key => $field_label) {
+                        if (!array_key_exists($key, $new)) {
+                            continue;
+                        }
+                        $old_val = is_array($old) && array_key_exists($key, $old) ? $old[$key] : null;
+                        if ((string) $old_val === (string) $new[$key]) {
+                            continue; // unchanged — not worth a line
+                        }
+                        $lines[] = sprintf(
+                            '%s: %s &rarr; %s',
+                            esc_html($field_label),
+                            esc_html($old_val !== null && $old_val !== '' ? $old_val : '—'),
+                            esc_html($new[$key] !== null && $new[$key] !== '' ? $new[$key] : '—')
+                        );
+                    }
+                    $detail = implode('<br>', $lines);
+                }
+                break;
+
+            case 'status_changed':
+                $label = Bookflow_I18n::t('admin.status_updated');
+                // $note already reads "Status changed from X to Y" in
+                // plain English from Bookflow_Logger::log_status_change() —
+                // nothing extra to add here.
+                break;
+
+            case 'booking_deleted':
+                $label = Bookflow_I18n::t('admin.delete_permanently');
+                break;
+            case 'booking_trashed':
+                $label = Bookflow_I18n::t('admin.trash');
+                break;
+            case 'booking_restored':
+                $label = Bookflow_I18n::t('admin.restore');
+                break;
+
+            default:
+                $label = ucwords(str_replace('_', ' ', $log->action));
+        }
+
+        return ['label' => $label, 'detail' => $detail, 'note' => $note];
     }
 }

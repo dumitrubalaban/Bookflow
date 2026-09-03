@@ -630,6 +630,46 @@ class Bookflow_Booking {
     }
 
     /**
+     * Revenue + booking count grouped by day, for a simple reports chart.
+     */
+    public static function get_revenue_by_day($args = []) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'bookflow_bookings';
+
+        $where = ["status NOT IN ('cancelled', 'refunded')"];
+        $values = [];
+        if (!empty($args['date_from'])) { $where[] = 'booking_date >= %s'; $values[] = $args['date_from']; }
+        if (!empty($args['date_to'])) { $where[] = 'booking_date <= %s'; $values[] = $args['date_to']; }
+        if (!empty($args['product_id'])) { $where[] = 'product_id = %d'; $values[] = absint($args['product_id']); }
+
+        $where_clause = implode(' AND ', $where);
+        $sql = "SELECT booking_date as date, COALESCE(SUM(cost), 0) as revenue, COUNT(*) as bookings
+                FROM $table WHERE $where_clause GROUP BY booking_date ORDER BY booking_date ASC";
+
+        return !empty($values) ? $wpdb->get_results($wpdb->prepare($sql, ...$values)) : $wpdb->get_results($sql);
+    }
+
+    /**
+     * Revenue + booking count grouped by product, for a top-products table.
+     */
+    public static function get_revenue_by_product($args = []) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'bookflow_bookings';
+
+        $where = ["status NOT IN ('cancelled', 'refunded')"];
+        $values = [];
+        if (!empty($args['date_from'])) { $where[] = 'booking_date >= %s'; $values[] = $args['date_from']; }
+        if (!empty($args['date_to'])) { $where[] = 'booking_date <= %s'; $values[] = $args['date_to']; }
+        if (!empty($args['product_id'])) { $where[] = 'product_id = %d'; $values[] = absint($args['product_id']); }
+
+        $where_clause = implode(' AND ', $where);
+        $sql = "SELECT product_id, COALESCE(SUM(cost), 0) as revenue, COUNT(*) as bookings
+                FROM $table WHERE $where_clause GROUP BY product_id ORDER BY revenue DESC LIMIT 10";
+
+        return !empty($values) ? $wpdb->get_results($wpdb->prepare($sql, ...$values)) : $wpdb->get_results($sql);
+    }
+
+    /**
      * Delete a booking
      */
     public static function delete($id) {
