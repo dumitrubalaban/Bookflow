@@ -430,5 +430,6 @@
     "form.rating_link_invalid": "Acest link de evaluare este invalid sau a expirat.",
     "email.subject.abandoned_followup": "Mai sunteți interesat de %s?",
     "email.body.abandoned_followup": "Bună %1$s, am observat că ați început rezervarea pentru %2$s dar nu ați finalizat. Locul este încă disponibil — continuați de unde ați rămas.",
-    "email.label.finish_booking": "Finalizează rezervarea"
+    "email.label.finish_booking": "Finalizează rezervarea",
+    "form.booking_details": "Rezervarea dvs."
 }

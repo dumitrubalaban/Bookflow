@@ -45,11 +45,14 @@ class Bookflow_Frontend {
         do_action('woocommerce_before_add_to_cart_form');
         ?>
         <form class="cart" action="<?php echo esc_url(apply_filters('woocommerce_add_to_cart_form_action', $product->get_permalink())); ?>" method="post" enctype="multipart/form-data">
-            <?php do_action('woocommerce_before_add_to_cart_button'); ?>
-            <input type="hidden" name="add-to-cart" value="<?php echo esc_attr($product->get_id()); ?>">
-            <button type="submit" id="bookflow-submit" name="add-to-cart" value="<?php echo esc_attr($product->get_id()); ?>" class="single_add_to_cart_button button alt" disabled>
-                <?php echo esc_html($product->single_add_to_cart_text()); ?>
-            </button>
+            <?php do_action('woocommerce_before_add_to_cart_button'); // renders the whole wizard, incl. its own .bookflow-booking-form opening tag ?>
+            <div class="bookflow-wizard-nav bookflow-final-nav" id="bookflow-final-nav">
+                <input type="hidden" name="add-to-cart" value="<?php echo esc_attr($product->get_id()); ?>">
+                <button type="submit" id="bookflow-submit" name="add-to-cart" value="<?php echo esc_attr($product->get_id()); ?>" class="bookflow-wizard-next" disabled>
+                    <?php echo esc_html($product->single_add_to_cart_text()); ?>
+                </button>
+            </div>
+            </div><!-- .bookflow-booking-form, opened inside templates/booking-form.php -->
             <?php do_action('woocommerce_after_add_to_cart_button'); ?>
         </form>
         <?php

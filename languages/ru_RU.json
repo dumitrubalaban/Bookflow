@@ -430,5 +430,6 @@
     "form.rating_link_invalid": "Эта ссылка для оценки недействительна или истекла.",
     "email.subject.abandoned_followup": "Всё ещё интересует %s?",
     "email.body.abandoned_followup": "Здравствуйте, %1$s! Мы заметили, что вы начали бронирование %2$s, но не завершили его. Место всё ещё доступно — продолжите с того места, где остановились.",
-    "email.label.finish_booking": "Завершить бронирование"
+    "email.label.finish_booking": "Завершить бронирование",
+    "form.booking_details": "Ваше бронирование"
 }

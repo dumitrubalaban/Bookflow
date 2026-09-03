@@ -442,5 +442,6 @@
     "form.rating_link_invalid": "This rating link is invalid or has expired.",
     "email.subject.abandoned_followup": "Still interested in %s?",
     "email.body.abandoned_followup": "Hi %1$s, we noticed you started booking %2$s but didn't finish. Your spot is still available — pick up right where you left off.",
-    "email.label.finish_booking": "Finish my booking"
+    "email.label.finish_booking": "Finish my booking",
+    "form.booking_details": "Your Booking"
 }

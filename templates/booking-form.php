@@ -139,8 +139,12 @@ $extras         = Bookflow_Extras::get_all('active');
         </div>
     </div>
 
-    <!-- Confirm: extras + price summary + submit -->
+    <!-- Confirm: recap + extras + price summary + submit -->
     <div class="bookflow-wizard-step" data-step="confirm" id="bookflow-step-confirm">
+        <div class="bookflow-recap" id="bookflow-recap">
+            <h3 class="bookflow-section-title"><?php Bookflow_I18n::te('form.booking_details'); ?></h3>
+            <div class="bookflow-recap-list" id="bookflow-recap-list"></div>
+        </div>
         <?php if (!empty($extras)) : ?>
         <div class="bookflow-extras-block" id="bookflow-extras-block">
             <h3 class="bookflow-section-title"><?php Bookflow_I18n::te('form.extras_title'); ?></h3>
@@ -193,4 +197,3 @@ $extras         = Bookflow_Extras::get_all('active');
         <button type="button" class="bookflow-wizard-next" id="bookflow-wizard-next"><?php Bookflow_I18n::te('wizard.next'); ?></button>
     </div>
 
-</div>

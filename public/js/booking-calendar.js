@@ -83,6 +83,8 @@
         els.stepper = document.getElementById('bookflow-wizard-stepper');
         els.backBtn = document.getElementById('bookflow-wizard-back');
         els.nextBtn2 = document.getElementById('bookflow-wizard-next');
+        els.finalNav = document.getElementById('bookflow-final-nav');
+        if (els.finalNav) els.finalNav.style.display = 'none';
 
         if (!els.calendar) return;
 
@@ -176,6 +178,7 @@
             els.nextBtn2.style.display = isLast ? 'none' : '';
             els.nextBtn2.disabled = !isStepComplete(state.currentStep);
         }
+        if (els.finalNav) els.finalNav.style.display = isLast ? '' : 'none';
     }
 
     function goToStep(step) {
@@ -209,6 +212,7 @@
         } else if (step === 'persons' || step === 'contact' || step === 'confirm') {
             updatePersonsVisibility();
             updatePrice();
+            if (step === 'confirm') renderRecap();
         }
 
         checkFormReady();
@@ -350,7 +354,7 @@
         if (!els.locationsGrid) return;
         if (els.locationsGrid.dataset.loaded) return;
 
-        els.locationsGrid.innerHTML = '<div class="bookflow-loading">' + bookflowBooking.i18n.loading + '</div>';
+        els.locationsGrid.innerHTML = '<div class="bookflow-loading"><span class="bookflow-spinner"></span><span>' + bookflowBooking.i18n.loading + '</span></div>';
 
         restFetch('locations').then(function (locations) {
             els.locationsGrid.dataset.loaded = '1';
@@ -950,7 +954,7 @@
     // === Staff (guide/person who performs the trip) step — runs before time ===
 
     function loadStaffForDate(date) {
-        els.resourcesGrid.innerHTML = '<div class="bookflow-loading">' + bookflowBooking.i18n.loading + '</div>';
+        els.resourcesGrid.innerHTML = '<div class="bookflow-loading"><span class="bookflow-spinner"></span><span>' + bookflowBooking.i18n.loading + '</span></div>';
 
         var params = { product_id: bookflowBooking.productId, date: date };
         if (state.selectedSchedule) params.schedule_id = state.selectedSchedule;
@@ -1010,7 +1014,7 @@
     // === Time / Slots step ===
 
     function loadSlotsForDate(date) {
-        els.slotsGrid.innerHTML = '<div class="bookflow-loading">' + bookflowBooking.i18n.loading + '</div>';
+        els.slotsGrid.innerHTML = '<div class="bookflow-loading"><span class="bookflow-spinner"></span><span>' + bookflowBooking.i18n.loading + '</span></div>';
 
         var ids = state.selectedScheduleIds || (state.selectedSchedule ? [state.selectedSchedule] : []);
 
@@ -1143,6 +1147,48 @@
                 step: state.currentStep,
             }, function () {}, function () {});
         }, 800);
+    }
+
+    // A plain-language recap of every choice made so far, shown at the top
+    // of the Confirm step — reading a price total alone doesn't tell anyone
+    // whether they actually booked the right day/guide/language.
+    function renderRecap() {
+        var list = document.getElementById('bookflow-recap-list');
+        if (!list) return;
+
+        var rows = [];
+
+        var locBtn = document.querySelector('.bookflow-location-selected .bookflow-location-name');
+        if (locBtn) rows.push([bookflowBooking.i18n.stepLocation, locBtn.textContent]);
+
+        var langTrigger = document.querySelector('#bookflow-lang-select .bookflow-custom-select__trigger span');
+        if (bookflowBooking.hasSchedules && langTrigger && langTrigger.textContent && langTrigger.textContent !== bookflowBooking.i18n.selectSchedule) {
+            rows.push([bookflowBooking.i18n.stepLanguage, langTrigger.textContent]);
+        }
+
+        if (state.selectedDate) {
+            rows.push([bookflowBooking.i18n.stepDay, formatDateLabel(state.selectedDate)]);
+        }
+
+        var guideCard = document.querySelector('.bookflow-resource-selected .bookflow-resource-name');
+        if (guideCard) rows.push([bookflowBooking.i18n.stepStaff, guideCard.textContent]);
+
+        if (state.selectedSlot) {
+            rows.push([bookflowBooking.i18n.stepTime, state.selectedSlot]);
+        }
+
+        var personsLabel = bookflowBooking.hasPersonTypes ? els.personsTotalInput : els.personsInput;
+        if (personsLabel && personsLabel.value) {
+            rows.push([bookflowBooking.i18n.stepPersons, personsLabel.value]);
+        }
+
+        var nameEl = document.getElementById('bookflow-customer-name');
+        var phoneEl = document.getElementById('bookflow-customer-phone');
+        if (nameEl && nameEl.value.trim()) rows.push([bookflowBooking.i18n.stepContact, nameEl.value.trim() + (phoneEl && phoneEl.value.trim() ? ' · ' + phoneEl.value.trim() : '')]);
+
+        list.innerHTML = rows.map(function (r) {
+            return '<div class="bookflow-recap-row"><span class="bookflow-recap-label">' + escapeHtml(r[0]) + '</span><span class="bookflow-recap-value">' + escapeHtml(r[1]) + '</span></div>';
+        }).join('');
     }
 
     function updatePrice() {
