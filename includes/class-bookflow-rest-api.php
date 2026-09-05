@@ -19,7 +19,7 @@ class Bookflow_REST_API {
             [
                 'methods'             => WP_REST_Server::READABLE,
                 'callback'            => [$this, 'get_bookings'],
-                'permission_callback' => [$this, 'admin_permission'],
+                'permission_callback' => [$this, 'scoped_booking_permission'],
                 'args'                => $this->get_collection_params(),
             ],
             [
@@ -34,12 +34,12 @@ class Bookflow_REST_API {
             [
                 'methods'             => WP_REST_Server::READABLE,
                 'callback'            => [$this, 'get_booking'],
-                'permission_callback' => [$this, 'admin_permission'],
+                'permission_callback' => [$this, 'scoped_booking_permission'],
             ],
             [
                 'methods'             => WP_REST_Server::EDITABLE,
                 'callback'            => [$this, 'update_booking'],
-                'permission_callback' => [$this, 'admin_permission'],
+                'permission_callback' => [$this, 'scoped_booking_permission'],
             ],
             [
                 'methods'             => WP_REST_Server::DELETABLE,
@@ -51,13 +51,13 @@ class Bookflow_REST_API {
         register_rest_route(self::NAMESPACE, '/bookings/(?P<id>\d+)/status', [
             'methods'             => WP_REST_Server::EDITABLE,
             'callback'            => [$this, 'update_status'],
-            'permission_callback' => [$this, 'admin_permission'],
+            'permission_callback' => [$this, 'scoped_booking_permission'],
         ]);
 
         register_rest_route(self::NAMESPACE, '/bookings/(?P<id>\d+)/reschedule', [
             'methods'             => WP_REST_Server::EDITABLE,
             'callback'            => [$this, 'reschedule_booking'],
-            'permission_callback' => [$this, 'admin_permission'],
+            'permission_callback' => [$this, 'scoped_booking_permission'],
         ]);
 
         // Availability (public)
@@ -201,16 +201,78 @@ class Bookflow_REST_API {
             'callback'            => [$this, 'set_customer_flag'],
             'permission_callback' => [$this, 'admin_permission'],
         ]);
+
+        // Resource managers (full admin only — this grants access, so it
+        // doesn't itself accept scoped_booking_permission). See
+        // Bookflow_Resource_Managers.
+        register_rest_route(self::NAMESPACE, '/resource-managers', [
+            [
+                'methods'             => WP_REST_Server::CREATABLE,
+                'callback'            => [$this, 'assign_resource_manager'],
+                'permission_callback' => [$this, 'admin_permission'],
+            ],
+            [
+                'methods'             => WP_REST_Server::DELETABLE,
+                'callback'            => [$this, 'unassign_resource_manager'],
+                'permission_callback' => [$this, 'admin_permission'],
+            ],
+        ]);
     }
 
     // --- Permissions ---
 
     public function admin_permission($request) {
-        // A theme/integration can grant equivalent access to a narrower
-        // role (e.g. an "instructor" role that may only manage its own
-        // bookings) by hooking this filter instead of granting the broad
-        // manage_woocommerce capability.
+        // A theme/integration can grant equivalent full access to a
+        // narrower role by hooking this filter instead of granting the
+        // broad manage_woocommerce capability. For per-resource-scoped
+        // access (e.g. "this instructor may only see their own bookings"),
+        // use scoped_booking_permission() below instead — this method is
+        // still all-or-nothing.
         return apply_filters('bookflow_rest_admin_permission', current_user_can('manage_woocommerce'), $request);
+    }
+
+    /**
+     * Like admin_permission(), but also lets in a user who only has
+     * `bookflow_manage_own_bookings` plus at least one row in
+     * Bookflow_Resource_Managers — i.e. real per-resource authorization
+     * instead of the all-or-nothing manage_woocommerce gate. The endpoint
+     * itself is still responsible for narrowing what such a user actually
+     * sees/changes (see get_bookings()'s resource_id__in filtering and
+     * user_can_access_booking()'s per-booking check below) — this callback
+     * only decides whether the request is allowed in the door at all.
+     */
+    public function scoped_booking_permission($request) {
+        if ($this->admin_permission($request)) {
+            return true;
+        }
+
+        if (!current_user_can('bookflow_manage_own_bookings')) {
+            return false;
+        }
+
+        // A route with a booking {id} — verify this specific booking
+        // belongs to one of the user's managed resources. The list route
+        // (GET /bookings) has no {id} in its URL and is left to filter its
+        // own results instead, since "may I list bookings at all" and
+        // "which ones" are different questions there.
+        if (isset($request['id'])) {
+            $booking = Bookflow_Booking::get($request['id']);
+            return $booking && $this->user_can_access_booking(get_current_user_id(), $booking);
+        }
+
+        return true;
+    }
+
+    private function user_can_access_booking($user_id, $booking) {
+        if (current_user_can('manage_woocommerce')) {
+            return true;
+        }
+        foreach (Bookflow_Booking_Resources::get_for_booking($booking->id) as $resource) {
+            if (Bookflow_Resource_Managers::user_manages_resource($user_id, $resource->resource_id)) {
+                return true;
+            }
+        }
+        return Bookflow_Resource_Managers::user_manages_resource($user_id, $booking->resource_id);
     }
 
     // --- Bookings ---
@@ -228,6 +290,14 @@ class Bookflow_REST_API {
             if ($val !== null) {
                 $args[$filter] = $val;
             }
+        }
+
+        // A scoped (non-manage_woocommerce) caller only reaches this point
+        // via `bookflow_manage_own_bookings` — restrict the listing to their
+        // managed resources rather than the whole business's bookings.
+        if (!current_user_can('manage_woocommerce')) {
+            $managed = Bookflow_Resource_Managers::get_resource_ids_for_user(get_current_user_id());
+            $args['resource_id__in'] = !empty($managed) ? $managed : [0]; // no managed resources => no results, not "everything"
         }
 
         $bookings = Bookflow_Booking::query($args);
@@ -854,7 +924,7 @@ class Bookflow_REST_API {
             return new WP_Error('invalid_product', Bookflow_I18n::t('error.booking_not_found'), ['status' => 400]);
         }
 
-        $credit_type = get_post_meta($product_id, '_bookflow_credit_type', true);
+        $credit_type = Bookflow_Product_Config::credit_type($product_id);
         if (empty($credit_type)) {
             return new WP_Error('not_credit_gated', Bookflow_I18n::t('error.invalid_request'), ['status' => 400]);
         }
@@ -906,7 +976,7 @@ class Bookflow_REST_API {
         // than creating with status='confirmed' directly) fires the normal
         // bookflow_booking_confirmed action, which is what actually
         // consumes the credit.
-        if (!get_post_meta($product_id, '_bookflow_requires_manual_approval', true)) {
+        if (!Bookflow_Product_Config::requires_manual_approval($product_id)) {
             Bookflow_Booking::transition_status($booking_id, 'confirmed');
         }
 
@@ -1124,6 +1194,30 @@ class Bookflow_REST_API {
         if (!$ok) {
             return new WP_Error('db_error', 'Could not set flag.', ['status' => 500]);
         }
+
+        return rest_ensure_response(['success' => true]);
+    }
+
+    public function assign_resource_manager($request) {
+        $user_id = absint($request->get_param('user_id'));
+        $resource_id = absint($request->get_param('resource_id'));
+        if (!$user_id || !$resource_id) {
+            return new WP_Error('invalid_request', Bookflow_I18n::t('error.invalid_request'), ['status' => 400]);
+        }
+
+        Bookflow_Resource_Managers::assign($user_id, $resource_id);
+
+        return rest_ensure_response(['success' => true]);
+    }
+
+    public function unassign_resource_manager($request) {
+        $user_id = absint($request->get_param('user_id'));
+        $resource_id = absint($request->get_param('resource_id'));
+        if (!$user_id || !$resource_id) {
+            return new WP_Error('invalid_request', Bookflow_I18n::t('error.invalid_request'), ['status' => 400]);
+        }
+
+        Bookflow_Resource_Managers::unassign($user_id, $resource_id);
 
         return rest_ensure_response(['success' => true]);
     }

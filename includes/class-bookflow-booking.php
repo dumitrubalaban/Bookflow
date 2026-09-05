@@ -12,6 +12,46 @@ if (!defined('ABSPATH')) {
 class Bookflow_Booking {
 
     /**
+     * Every create() business-rule check that doesn't require the
+     * slot-locking transaction — i.e. isn't racing another concurrent
+     * booking for the same capacity. Kept separate from create() itself so
+     * new non-concurrency rules (there have already been three: eligibility,
+     * anti-hoarding, cost/end_time normalization) have one obvious place to
+     * go instead of growing create() indefinitely.
+     *
+     * @return array|WP_Error normalized $data on success
+     */
+    private static function validate_pre_checks($data, $product) {
+        // Generic eligibility gate — e.g. a customer flag a product requires
+        // before it can be booked at all. See Bookflow_Customer_Flags.
+        if ($data['customer_id'] && !Bookflow_Customer_Flags::is_product_bookable_for_customer($data['product_id'], $data['customer_id'])) {
+            return new WP_Error('not_eligible', Bookflow_I18n::t('error.not_eligible'));
+        }
+
+        // Generic anti-hoarding limit — a product can cap how many
+        // pending/confirmed bookings one customer may hold at once.
+        $max_active = Bookflow_Product_Config::max_active_bookings_per_customer($data['product_id']);
+        if ($max_active > 0 && $data['customer_id']) {
+            $active_count = self::count_active_for_customer($data['customer_id'], $data['product_id']);
+            if ($active_count >= $max_active) {
+                return new WP_Error('too_many_active_bookings', Bookflow_I18n::t('error.too_many_active_bookings'));
+            }
+        }
+
+        // Ensure cost is never negative
+        $data['cost'] = max(0, (float) $data['cost']);
+
+        // Calculate end_time from duration if not provided
+        if (empty($data['end_time']) && !empty($data['start_time'])) {
+            $duration = $product->get_duration();
+            $start = strtotime($data['booking_date'] . ' ' . $data['start_time']);
+            $data['end_time'] = gmdate('H:i', $start + ($duration * 60));
+        }
+
+        return $data;
+    }
+
+    /**
      * Create a new booking with concurrency protection
      */
     public static function create($data) {
@@ -53,30 +93,12 @@ class Bookflow_Booking {
             return new WP_Error('invalid_product', Bookflow_I18n::t('error.booking_not_found'));
         }
 
-        // Generic eligibility gate — e.g. a customer flag a product requires
-        // before it can be booked at all. See Bookflow_Customer_Flags.
-        if ($data['customer_id'] && !Bookflow_Customer_Flags::is_product_bookable_for_customer($data['product_id'], $data['customer_id'])) {
-            return new WP_Error('not_eligible', Bookflow_I18n::t('error.not_eligible'));
-        }
-
-        // Generic anti-hoarding limit — a product can cap how many
-        // pending/confirmed bookings one customer may hold at once.
-        $max_active = (int) get_post_meta($data['product_id'], '_bookflow_max_active_bookings_per_customer', true);
-        if ($max_active > 0 && $data['customer_id']) {
-            $active_count = self::count_active_for_customer($data['customer_id'], $data['product_id']);
-            if ($active_count >= $max_active) {
-                return new WP_Error('too_many_active_bookings', Bookflow_I18n::t('error.too_many_active_bookings'));
-            }
-        }
-
-        // Ensure cost is never negative
-        $data['cost'] = max(0, (float) $data['cost']);
-
-        // Calculate end_time from duration if not provided
-        if (empty($data['end_time']) && !empty($data['start_time'])) {
-            $duration = $product->get_duration();
-            $start = strtotime($data['booking_date'] . ' ' . $data['start_time']);
-            $data['end_time'] = gmdate('H:i', $start + ($duration * 60));
+        // Every check that doesn't need the slot-locking transaction below
+        // (business rules, not concurrency-sensitive capacity) lives in one
+        // place so create() itself stays readable as new rules are added.
+        $data = self::validate_pre_checks($data, $product);
+        if (is_wp_error($data)) {
+            return $data;
         }
 
         // Concurrency check: verify slot is still available before insert
@@ -573,6 +595,15 @@ class Bookflow_Booking {
             $values[] = absint($args['resource_id']);
         }
 
+        // Scope a query to any of several resources — e.g. a staff user who
+        // only manages a subset of resources listing their own bookings.
+        if (!empty($args['resource_id__in'])) {
+            $ids = array_map('absint', (array) $args['resource_id__in']);
+            $placeholders = implode(',', array_fill(0, count($ids), '%d'));
+            $where[] = "resource_id IN ($placeholders)";
+            $values = array_merge($values, $ids);
+        }
+
         if (!empty($args['status'])) {
             if (is_array($args['status'])) {
                 $placeholders = implode(',', array_fill(0, count($args['status']), '%s'));
@@ -669,6 +700,13 @@ class Bookflow_Booking {
                 $where[] = "$int_field = %d";
                 $values[] = absint($args[$int_field]);
             }
+        }
+
+        if (!empty($args['resource_id__in'])) {
+            $ids = array_map('absint', (array) $args['resource_id__in']);
+            $placeholders = implode(',', array_fill(0, count($ids), '%d'));
+            $where[] = "resource_id IN ($placeholders)";
+            $values = array_merge($values, $ids);
         }
 
         if (!empty($args['status'])) {

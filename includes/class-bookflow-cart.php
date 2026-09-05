@@ -493,7 +493,7 @@ class Bookflow_Cart {
             // until staff explicitly approve or reject it. Payment capture
             // ('paid'/'partially-paid'/'cancelled'/'refunded') still applies
             // normally; only the 'confirmed' transition is gated.
-            if ($status === 'confirmed' && get_post_meta($booking->product_id, '_bookflow_requires_manual_approval', true)) {
+            if ($status === 'confirmed' && Bookflow_Product_Config::requires_manual_approval($booking->product_id)) {
                 continue;
             }
 

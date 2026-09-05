@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 }
 
 define('BOOKFLOW_VERSION', '1.0.0');
-define('BOOKFLOW_DB_VERSION', '1.14.0');
+define('BOOKFLOW_DB_VERSION', '1.15.0');
 define('BOOKFLOW_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('BOOKFLOW_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('BOOKFLOW_PLUGIN_FILE', __FILE__);
@@ -88,6 +88,7 @@ function bookflow_init() {
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-rate-limit.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-spam.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-product-type.php';
+    require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-product-config.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-booking.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-resources.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-extras.php';
@@ -98,6 +99,7 @@ function bookflow_init() {
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-webhooks.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-credits.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-resource-pins.php';
+    require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-resource-managers.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-booking-resources.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-customer-flags.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-booking-notes.php';

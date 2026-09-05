@@ -28,7 +28,7 @@ class Bookflow_Customer_Flags {
             return $bookable;
         }
 
-        $required_key = get_post_meta($product_id, '_bookflow_requires_flag', true);
+        $required_key = Bookflow_Product_Config::required_flag_key($product_id);
         if (empty($required_key)) {
             return $bookable;
         }
@@ -42,7 +42,7 @@ class Bookflow_Customer_Flags {
             return false;
         }
 
-        $required_value = get_post_meta($product_id, '_bookflow_requires_flag_value', true);
+        $required_value = Bookflow_Product_Config::required_flag_value($product_id);
         if ($required_value !== '' && (string) $value !== (string) $required_value) {
             return false;
         }

@@ -392,6 +392,25 @@ class Bookflow_Install {
             KEY resource_id (resource_id)
         ) $charset_collate;");
 
+        // Resource managers — which WP users may manage which resources
+        // (e.g. an "instructor" account scoped to their own bookings only),
+        // distinct from bookflow_customer_resource_pins (which is the
+        // customer-facing "my assigned provider" binding, not a staff
+        // permission). A user with none of the manage_woocommerce capability
+        // but at least one row here gets scoped REST access — see
+        // Bookflow_Resource_Managers and the bookflow_manage_own_bookings
+        // capability check in class-bookflow-rest-api.php.
+        dbDelta("CREATE TABLE {$wpdb->prefix}bookflow_resource_managers (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            user_id bigint(20) unsigned NOT NULL,
+            resource_id bigint(20) unsigned NOT NULL,
+            created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY user_resource (user_id, resource_id),
+            KEY user_id (user_id),
+            KEY resource_id (resource_id)
+        ) $charset_collate;");
+
         // Customer flags — a generic per-customer key/value eligibility flag
         // (e.g. "is this customer allowed to book product X yet?"). Bookflow
         // core only reads/writes flag_key/flag_value as opaque strings; the

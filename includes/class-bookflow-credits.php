@@ -50,7 +50,7 @@ class Bookflow_Credits {
             return;
         }
 
-        $credit_type = get_post_meta($booking->product_id, '_bookflow_credit_type', true);
+        $credit_type = Bookflow_Product_Config::credit_type($booking->product_id);
         if (empty($credit_type)) {
             return;
         }
@@ -69,7 +69,7 @@ class Bookflow_Credits {
             return;
         }
 
-        $credit_type = get_post_meta($booking->product_id, '_bookflow_credit_type', true);
+        $credit_type = Bookflow_Product_Config::credit_type($booking->product_id);
         if (empty($credit_type)) {
             return;
         }
@@ -115,13 +115,13 @@ class Bookflow_Credits {
                 continue;
             }
 
-            $credit_type = get_post_meta($product->get_id(), '_bookflow_grants_credit_type', true);
-            $amount_per_unit = (int) get_post_meta($product->get_id(), '_bookflow_grants_credit_amount', true);
+            $credit_type = Bookflow_Product_Config::grants_credit_type($product->get_id());
+            $amount_per_unit = Bookflow_Product_Config::grants_credit_amount($product->get_id());
             if (empty($credit_type) || $amount_per_unit <= 0) {
                 continue;
             }
 
-            $expires_days = (int) get_post_meta($product->get_id(), '_bookflow_grants_credit_expires_days', true);
+            $expires_days = Bookflow_Product_Config::grants_credit_expires_days($product->get_id());
             $expires_at = $expires_days > 0 ? gmdate('Y-m-d H:i:s', strtotime("+{$expires_days} days")) : null;
 
             $credit_id = self::grant($customer_id, $amount_per_unit * max(1, $item->get_quantity()), [
