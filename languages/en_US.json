@@ -70,6 +70,7 @@
     "error.not_eligible": "You are not yet eligible to book this.",
     "error.too_many_active_bookings": "You already have the maximum number of active bookings allowed.",
     "error.resource_unavailable": "A required resource is not available for this slot.",
+    "error.no_credits": "You have no remaining credits to book this.",
     "cart.date": "Date",
     "cart.time": "Time",
     "cart.persons": "Persons",

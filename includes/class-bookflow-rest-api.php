@@ -129,6 +129,17 @@ class Bookflow_REST_API {
             'permission_callback' => '__return_true',
         ]);
 
+        // Redeem a pre-paid credit directly (no WooCommerce order/payment) —
+        // the counterpart to /reservations for products that opted into
+        // Bookflow_Credits via `_bookflow_credit_type` instead of being sold
+        // per-booking. Requires the caller to be logged in as the customer
+        // redeeming their own balance.
+        register_rest_route(self::NAMESPACE, '/bookings/redeem', [
+            'methods'             => WP_REST_Server::CREATABLE,
+            'callback'            => [$this, 'redeem_credit_booking'],
+            'permission_callback' => 'is_user_logged_in',
+        ]);
+
         // Resources
         register_rest_route(self::NAMESPACE, '/resources', [
             'methods'             => WP_REST_Server::READABLE,
@@ -822,6 +833,84 @@ class Bookflow_REST_API {
                 'endTime'   => $booking->end_time,
             ],
         ]);
+    }
+
+    /**
+     * Redeem a unit of the current user's own credit balance to book a
+     * slot directly — no WooCommerce order/payment involved, since payment
+     * already happened whenever those credits were originally granted (see
+     * Bookflow_Credits::on_order_completed). Only usable on a product that
+     * opted into this via `_bookflow_credit_type`; anything else must still
+     * go through the normal /reservations + checkout flow.
+     */
+    public function redeem_credit_booking($request) {
+        if (!Bookflow_Rate_Limit::check('redeem_credit', 10, 60)) {
+            return new WP_Error('rate_limited', Bookflow_I18n::t('error.rate_limited'), ['status' => 429]);
+        }
+
+        $product_id = absint($request->get_param('product_id'));
+        $product = wc_get_product($product_id);
+        if (!$product || $product->get_type() !== 'booking') {
+            return new WP_Error('invalid_product', Bookflow_I18n::t('error.booking_not_found'), ['status' => 400]);
+        }
+
+        $credit_type = get_post_meta($product_id, '_bookflow_credit_type', true);
+        if (empty($credit_type)) {
+            return new WP_Error('not_credit_gated', Bookflow_I18n::t('error.invalid_request'), ['status' => 400]);
+        }
+
+        $customer_id = get_current_user_id();
+        if (Bookflow_Credits::get_balance($customer_id, $credit_type, $product_id) < 1) {
+            return new WP_Error('no_credits', Bookflow_I18n::t('error.no_credits'), ['status' => 402]);
+        }
+
+        $date = sanitize_text_field($request->get_param('date'));
+        $time = sanitize_text_field($request->get_param('start_time'));
+        $resource_id = $request->get_param('resource_id') ? absint($request->get_param('resource_id')) : null;
+        $persons = max(1, absint($request->get_param('persons') ?: 1));
+        $notes = sanitize_textarea_field($request->get_param('notes'));
+
+        if (!$date || !$time) {
+            return new WP_Error('missing_fields', Bookflow_I18n::t('error.invalid_request'), ['status' => 400]);
+        }
+
+        // Fast-fail before creating anything — Bookflow_Booking::create()
+        // still re-checks atomically under lock.
+        if (!Bookflow_Availability::is_slot_available($product_id, $date, $time, $resource_id)) {
+            return new WP_Error('slot_unavailable', Bookflow_I18n::t('error.slot_unavailable'), ['status' => 409]);
+        }
+
+        $user = wp_get_current_user();
+
+        $booking_id = Bookflow_Booking::create([
+            'product_id'      => $product_id,
+            'resource_id'     => $resource_id,
+            'customer_id'     => $customer_id,
+            'booking_date'    => $date,
+            'start_time'      => $time,
+            'persons_total'   => $persons,
+            'cost'            => 0,
+            'customer_name'   => $user->display_name,
+            'customer_email'  => $user->user_email,
+            'customer_phone'  => get_user_meta($customer_id, 'billing_phone', true),
+            'notes'           => $notes,
+        ]);
+
+        if (is_wp_error($booking_id)) {
+            return $booking_id;
+        }
+
+        // No WooCommerce order drives this booking's status, so it's
+        // confirmed right away unless the product opted into manual staff
+        // approval — either way, going through transition_status() (rather
+        // than creating with status='confirmed' directly) fires the normal
+        // bookflow_booking_confirmed action, which is what actually
+        // consumes the credit.
+        if (!get_post_meta($product_id, '_bookflow_requires_manual_approval', true)) {
+            Bookflow_Booking::transition_status($booking_id, 'confirmed');
+        }
+
+        return rest_ensure_response($this->prepare_booking(Bookflow_Booking::get($booking_id)));
     }
 
     /**

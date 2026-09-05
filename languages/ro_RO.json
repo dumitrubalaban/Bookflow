@@ -70,6 +70,7 @@
     "error.not_eligible": "Nu sunteți încă eligibil pentru a rezerva acest serviciu.",
     "error.too_many_active_bookings": "Aveți deja numărul maxim de rezervări active permise.",
     "error.resource_unavailable": "O resursă necesară nu este disponibilă pentru acest interval.",
+    "error.no_credits": "Nu mai aveți lecții disponibile pentru rezervare.",
     "cart.date": "Data",
     "cart.time": "Ora",
     "cart.persons": "Persoane",

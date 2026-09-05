@@ -16,6 +16,15 @@
  * refunds that unit. Products that don't set this meta are entirely
  * unaffected — the feature is opt-in per product.
  *
+ * The other side of the same generic mechanism — granting credits in the
+ * first place — is opt-in the same way: ANY regular (non-booking) WooCommerce
+ * product can set `_bookflow_grants_credit_type` + `_bookflow_grants_credit_amount`
+ * (and optionally `_bookflow_grants_credit_expires_days`) to become a
+ * "package" purchase. When such a product's order completes, the buyer is
+ * granted that many credits — no booking-specific code involved, so this
+ * works for a prepaid class pack, a punch card, or anything else shaped like
+ * "buy once, redeem N times" just as well as a lesson package.
+ *
  * @package Bookflow
  */
 
@@ -28,6 +37,7 @@ class Bookflow_Credits {
     public function __construct() {
         add_action('bookflow_booking_confirmed', [$this, 'on_confirmed']);
         add_action('bookflow_booking_cancelled', [$this, 'on_cancelled']);
+        add_action('woocommerce_order_status_completed', [$this, 'on_order_completed']);
     }
 
     /**
@@ -76,6 +86,55 @@ class Bookflow_Credits {
         }
 
         self::refund($booking_id, 'cancelled');
+    }
+
+    /**
+     * Grant credits for every line item, in a completed order, whose
+     * product opted in via `_bookflow_grants_credit_type` +
+     * `_bookflow_grants_credit_amount`. Idempotent per order item — safe if
+     * the 'completed' status hook fires more than once for the same order.
+     */
+    public function on_order_completed($order_id) {
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return;
+        }
+
+        $customer_id = $order->get_customer_id();
+        if (!$customer_id) {
+            return; // credits are redeemed by a logged-in account; a guest order has nowhere to grant them to
+        }
+
+        foreach ($order->get_items() as $item) {
+            if ($item->get_meta('_bookflow_credit_granted')) {
+                continue;
+            }
+
+            $product = $item->get_product();
+            if (!$product) {
+                continue;
+            }
+
+            $credit_type = get_post_meta($product->get_id(), '_bookflow_grants_credit_type', true);
+            $amount_per_unit = (int) get_post_meta($product->get_id(), '_bookflow_grants_credit_amount', true);
+            if (empty($credit_type) || $amount_per_unit <= 0) {
+                continue;
+            }
+
+            $expires_days = (int) get_post_meta($product->get_id(), '_bookflow_grants_credit_expires_days', true);
+            $expires_at = $expires_days > 0 ? gmdate('Y-m-d H:i:s', strtotime("+{$expires_days} days")) : null;
+
+            $credit_id = self::grant($customer_id, $amount_per_unit * max(1, $item->get_quantity()), [
+                'credit_type' => $credit_type,
+                'expires_at'  => $expires_at,
+            ]);
+
+            if (!is_wp_error($credit_id)) {
+                $item->add_meta_data('_bookflow_credit_granted', $credit_id);
+                $item->save();
+                do_action('bookflow_credit_granted_from_order', $credit_id, $customer_id, $order_id, $product->get_id());
+            }
+        }
     }
 
     /**

@@ -55,6 +55,7 @@ These generic mechanisms let an integrator model "package with a remaining balan
 | `bookflow_credit_consumed` | A credit unit was consumed from a pool | `$credit_id`, `$booking_id`, `$amount` |
 | `bookflow_credit_refunded` | Credit(s) for a booking were refunded | `$booking_id` |
 | `bookflow_credit_should_refund_on_cancel` (filter) | Decide whether a cancelled booking's consumed credit is refunded or forfeited | `$should_refund` (bool, default true), `$booking_id`, `$booking` |
+| `bookflow_credit_granted_from_order` | A `_bookflow_grants_credit_type` product's order completed and credits were granted | `$credit_id`, `$customer_id`, `$order_id`, `$product_id` |
 | `bookflow_bookable_resources_for_product` (filter) | Narrow the resource list a customer is offered for a product — this is where `Bookflow_Resource_Pins` restricts the list to a customer's pinned resource(s) | `$resources`, `$product_id` |
 | `bookflow_is_product_bookable_for_customer` (filter) | Generic eligibility gate checked in `Bookflow_Booking::create()` before any booking is created | `$bookable` (bool), `$product_id`, `$customer_id` |
 | `bookflow_customer_flag_set` | A customer flag was set | `$customer_id`, `$flag_key`, `$flag_value` |
@@ -66,7 +67,8 @@ Two product-level meta keys change core `Bookflow_Booking::create()` / status be
 
 | Meta key | Effect |
 |---|---|
-| `_bookflow_credit_type` | Booking confirmation auto-consumes one credit of this type from the customer's balance; cancellation auto-refunds it (unless `bookflow_credit_should_refund_on_cancel` returns false) |
+| `_bookflow_credit_type` | Booking confirmation auto-consumes one credit of this type from the customer's balance; cancellation auto-refunds it (unless `bookflow_credit_should_refund_on_cancel` returns false). A product set up this way can be redeemed directly via `POST /bookings/redeem` (logged-in customer, no WooCommerce order) instead of the normal checkout-based `/reservations` flow |
+| `_bookflow_grants_credit_type` + `_bookflow_grants_credit_amount` (+ optional `_bookflow_grants_credit_expires_days`) | On ANY regular (non-booking) product: completing an order containing it grants that many credits of that type to the buyer — this is how a "package"/"course" purchase funds the balance later redeemed against a `_bookflow_credit_type` booking product |
 | `_bookflow_max_active_bookings_per_customer` | Caps how many pending/confirmed bookings one customer may hold for this product at once |
 | `_bookflow_requires_flag` / `_bookflow_requires_flag_value` | Gates booking behind a customer flag (optionally a specific value) via `Bookflow_Customer_Flags` |
 | `_bookflow_requires_manual_approval` | Booking stays `pending` on order completion instead of auto-confirming; a staff role must call the `/bookings/{id}/status` REST endpoint (or `Bookflow_Cart::approve_booking()` / `reject_booking()`) |
