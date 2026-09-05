@@ -42,6 +42,7 @@ class Bookflow_Booking {
             'internal_notes'  => '',
             'ip_address'      => '',
             'user_agent'      => '',
+            'resource_ids'    => [],
         ];
 
         $data = wp_parse_args($data, $defaults);
@@ -50,6 +51,22 @@ class Bookflow_Booking {
         $product = wc_get_product($data['product_id']);
         if (!$product || $product->get_type() !== 'booking') {
             return new WP_Error('invalid_product', Bookflow_I18n::t('error.booking_not_found'));
+        }
+
+        // Generic eligibility gate — e.g. a customer flag a product requires
+        // before it can be booked at all. See Bookflow_Customer_Flags.
+        if ($data['customer_id'] && !Bookflow_Customer_Flags::is_product_bookable_for_customer($data['product_id'], $data['customer_id'])) {
+            return new WP_Error('not_eligible', Bookflow_I18n::t('error.not_eligible'));
+        }
+
+        // Generic anti-hoarding limit — a product can cap how many
+        // pending/confirmed bookings one customer may hold at once.
+        $max_active = (int) get_post_meta($data['product_id'], '_bookflow_max_active_bookings_per_customer', true);
+        if ($max_active > 0 && $data['customer_id']) {
+            $active_count = self::count_active_for_customer($data['customer_id'], $data['product_id']);
+            if ($active_count >= $max_active) {
+                return new WP_Error('too_many_active_bookings', Bookflow_I18n::t('error.too_many_active_bookings'));
+            }
         }
 
         // Ensure cost is never negative
@@ -169,6 +186,32 @@ class Bookflow_Booking {
             }
         }
 
+        // Lock and capacity-check any secondary resources (e.g. equipment
+        // paired with the primary staff resource) inside the same
+        // transaction, so a booking either gets every resource it needs or
+        // none of them.
+        $extra_resources = array_values(array_filter((array) $data['resource_ids']));
+        foreach ($extra_resources as $extra) {
+            $extra_id = is_array($extra) ? absint($extra['resource_id'] ?? 0) : absint($extra);
+            if (!$extra_id || $extra_id === $resource_id_val) {
+                continue;
+            }
+            $extra_resource = $wpdb->get_row($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
+                "SELECT capacity FROM {$wpdb->prefix}bookflow_resources WHERE id = %d AND status = 'active'",
+                $extra_id
+            ));
+            if (!$extra_resource) {
+                $wpdb->query('ROLLBACK'); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
+                return new WP_Error('resource_unavailable', Bookflow_I18n::t('error.resource_unavailable'));
+            }
+            $capacity = (int) $extra_resource->capacity ?: 1;
+            $extra_booked = Bookflow_Booking_Resources::count_booked($extra_id, $data['booking_date'], $data['start_time'], true);
+            if (($extra_booked + $requested_persons) > $capacity) {
+                $wpdb->query('ROLLBACK'); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
+                return new WP_Error('resource_capacity_exceeded', Bookflow_I18n::t('error.not_enough_capacity', max(0, $capacity - $extra_booked)));
+            }
+        }
+
         $result = $wpdb->insert($table, [ // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
             'product_id'      => absint($data['product_id']),
             'resource_id'     => $data['resource_id'] ? absint($data['resource_id']) : null,
@@ -203,6 +246,26 @@ class Bookflow_Booking {
         $booking_id = $wpdb->insert_id;
         $wpdb->query('COMMIT'); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists; live data required for booking/availability integrity
 
+        // Record every resource this booking holds (primary + any extras)
+        // in the many-to-many table, superseding the single resource_id
+        // column for anything that needs more than one resource per booking.
+        $all_resources = [];
+        if ($resource_id_val) {
+            $all_resources[] = ['resource_id' => $resource_id_val, 'role' => 'primary'];
+        }
+        foreach ($extra_resources as $extra) {
+            $extra_id = is_array($extra) ? absint($extra['resource_id'] ?? 0) : absint($extra);
+            if ($extra_id && $extra_id !== $resource_id_val) {
+                $all_resources[] = [
+                    'resource_id' => $extra_id,
+                    'role'        => is_array($extra) && !empty($extra['role']) ? $extra['role'] : 'secondary',
+                ];
+            }
+        }
+        if (!empty($all_resources)) {
+            Bookflow_Booking_Resources::attach($booking_id, $all_resources);
+        }
+
         // Fire action for cache invalidation, logging, emails
         do_action('bookflow_booking_created', $data, $booking_id);
 
@@ -211,6 +274,37 @@ class Bookflow_Booking {
         ]);
 
         return $booking_id;
+    }
+
+    /**
+     * Count a customer's currently pending/confirmed (i.e. "active", not yet
+     * resolved) bookings — used to enforce a per-product cap on how many
+     * future bookings one customer may hold at once.
+     */
+    public static function count_active_for_customer($customer_id, $product_id = null) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'bookflow_bookings';
+
+        // phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- custom table, no core API exists; $table built from prefix + literal only
+        if ($product_id) {
+            return (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM $table
+                 WHERE customer_id = %d AND product_id = %d
+                 AND status IN ('pending', 'confirmed', 'paid', 'partially-paid')
+                 AND deleted_at IS NULL",
+                absint($customer_id),
+                absint($product_id)
+            ));
+        }
+
+        return (int) $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM $table
+             WHERE customer_id = %d
+             AND status IN ('pending', 'confirmed', 'paid', 'partially-paid')
+             AND deleted_at IS NULL",
+            absint($customer_id)
+        ));
+        // phpcs:enable
     }
 
     /**
@@ -268,7 +362,20 @@ class Bookflow_Booking {
     /**
      * Transition booking status with state machine validation
      */
-    public static function transition_status($id, $new_status, $note = '') {
+    /**
+     * @param array $context {
+     *     Optional. Extra context recorded alongside a 'cancelled' transition.
+     *
+     *     @type string $cancelled_by Who initiated the cancellation —
+     *           'customer', 'staff', or 'system' (e.g. an unpaid order
+     *           auto-expiring). Free-text; Bookflow only stores and exposes
+     *           it via $booking->cancelled_by for filters like
+     *           `bookflow_credit_should_refund_on_cancel` to key a refund
+     *           policy on (e.g. only forfeit on a late customer cancel).
+     *           Defaults to 'staff' when omitted.
+     * }
+     */
+    public static function transition_status($id, $new_status, $note = '', $context = []) {
         $booking = self::get($id);
         if (!$booking) {
             return new WP_Error('not_found', Bookflow_I18n::t('error.booking_not_found'));
@@ -302,6 +409,7 @@ class Bookflow_Booking {
                 break;
             case 'cancelled':
                 $update_data['cancelled_at'] = $now;
+                $update_data['cancelled_by'] = sanitize_key($context['cancelled_by'] ?? 'staff');
                 if ($note) {
                     $update_data['cancellation_reason'] = sanitize_textarea_field($note);
                 }
@@ -673,6 +781,96 @@ class Bookflow_Booking {
                 FROM $table WHERE $where_clause GROUP BY product_id ORDER BY revenue DESC LIMIT 10";
 
         return !empty($values) ? $wpdb->get_results($wpdb->prepare($sql, ...$values)) : $wpdb->get_results($sql); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- built only from fixed literals + %d/%s placeholders; real values always passed through $wpdb->prepare()
+    }
+
+    /**
+     * Revenue/occupancy grouped by resource (e.g. per-instructor, per-room)
+     * — a generic breakdown any resource-based booking business can use for
+     * staff performance/utilization reporting.
+     */
+    public static function get_revenue_by_resource($args = []) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'bookflow_bookings';
+
+        $where = ["status NOT IN ('cancelled', 'refunded')", 'resource_id IS NOT NULL'];
+        $values = [];
+        if (!empty($args['date_from'])) { $where[] = 'booking_date >= %s'; $values[] = $args['date_from']; }
+        if (!empty($args['date_to'])) { $where[] = 'booking_date <= %s'; $values[] = $args['date_to']; }
+        if (!empty($args['product_id'])) { $where[] = 'product_id = %d'; $values[] = absint($args['product_id']); }
+
+        $where_clause = implode(' AND ', $where);
+        $sql = "SELECT resource_id, COALESCE(SUM(cost), 0) as revenue, COUNT(*) as bookings
+                FROM $table WHERE $where_clause GROUP BY resource_id ORDER BY revenue DESC LIMIT 50";
+
+        return !empty($values) ? $wpdb->get_results($wpdb->prepare($sql, ...$values)) : $wpdb->get_results($sql); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.PreparedSQL.NotPrepared -- built only from fixed literals + %d/%s placeholders; real values always passed through $wpdb->prepare()
+    }
+
+    /**
+     * Move a booking to a new date/time/resource(s) without treating it as
+     * a real cancellation: any credit already consumed for the original
+     * booking is silently re-keyed to the new booking id (so it's neither
+     * refunded nor consumed a second time), then the original is marked
+     * cancelled with cancelled_by='reschedule' (a marker theme code can use
+     * to distinguish this from a real cancellation in reporting/policy
+     * filters — Bookflow_Credits' own refund lookup finds nothing left
+     * under the old id by the time this runs, so no refund fires for it).
+     *
+     * $new_data accepts the same keys as create() (booking_date, start_time,
+     * resource_id, resource_ids, etc.); omitted keys default to the
+     * original booking's values.
+     *
+     * @return int|WP_Error new booking id
+     */
+    public static function reschedule($booking_id, $new_data = []) {
+        $old = self::get($booking_id);
+        if (!$old) {
+            return new WP_Error('not_found', Bookflow_I18n::t('error.booking_not_found'));
+        }
+
+        $carry_over_status = in_array($old->status, ['confirmed', 'paid', 'partially-paid'], true) ? $old->status : 'pending';
+
+        $data = wp_parse_args($new_data, [
+            'product_id'      => $old->product_id,
+            'resource_id'     => $old->resource_id,
+            'schedule_id'     => $old->schedule_id,
+            'order_id'        => $old->order_id,
+            'customer_id'     => $old->customer_id,
+            'booking_date'    => $old->booking_date,
+            'start_time'      => $old->start_time,
+            'persons_total'   => $old->persons_total,
+            'cost'            => $old->cost,
+            'full_total'      => $old->full_total,
+            'deposit_amount'  => $old->deposit_amount,
+            'status'          => $carry_over_status,
+            'customer_name'   => $old->customer_name,
+            'customer_email'  => $old->customer_email,
+            'customer_phone'  => $old->customer_phone,
+            'customer_locale' => $old->customer_locale,
+            'notes'           => $old->notes,
+        ]);
+        // Passing an explicit 'status' here (rather than the default
+        // 'pending') deliberately skips the bookflow_booking_confirmed
+        // action — create() only fires bookflow_booking_created — so this
+        // never double-consumes a credit; the original consume ledger row
+        // is re-keyed below instead.
+        $new_id = self::create($data);
+
+        if (is_wp_error($new_id)) {
+            return $new_id;
+        }
+
+        global $wpdb;
+        $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- custom table, no core API exists
+            $wpdb->prefix . 'bookflow_credit_transactions',
+            ['booking_id' => $new_id],
+            ['booking_id' => $booking_id, 'type' => 'consume']
+        );
+
+        self::transition_status($booking_id, 'cancelled', 'Rescheduled', ['cancelled_by' => 'reschedule']);
+
+        do_action('bookflow_booking_rescheduled', $booking_id, $new_id);
+
+        return $new_id;
     }
 
     /**

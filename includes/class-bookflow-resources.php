@@ -190,7 +190,7 @@ class Bookflow_Resources {
      * Get available resources for a slot
      */
     public static function get_available_for_slot($product_id, $date, $start_time) {
-        $resources = self::get_for_product($product_id);
+        $resources = apply_filters('bookflow_bookable_resources_for_product', self::get_for_product($product_id), $product_id);
         $available = [];
 
         foreach ($resources as $resource) {
@@ -208,7 +208,7 @@ class Bookflow_Resources {
      * which runs before a specific time is picked.
      */
     public static function get_available_for_date($product_id, $date, $schedule_id = null) {
-        $resources = self::get_for_product($product_id);
+        $resources = apply_filters('bookflow_bookable_resources_for_product', self::get_for_product($product_id), $product_id);
         $available = [];
 
         foreach ($resources as $resource) {

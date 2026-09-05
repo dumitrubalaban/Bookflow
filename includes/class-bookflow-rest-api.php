@@ -54,6 +54,12 @@ class Bookflow_REST_API {
             'permission_callback' => [$this, 'admin_permission'],
         ]);
 
+        register_rest_route(self::NAMESPACE, '/bookings/(?P<id>\d+)/reschedule', [
+            'methods'             => WP_REST_Server::EDITABLE,
+            'callback'            => [$this, 'reschedule_booking'],
+            'permission_callback' => [$this, 'admin_permission'],
+        ]);
+
         // Availability (public)
         register_rest_route(self::NAMESPACE, '/availability/(?P<product_id>\d+)/month', [
             'methods'             => WP_REST_Server::READABLE,
@@ -153,12 +159,47 @@ class Bookflow_REST_API {
             'callback'            => [$this, 'get_stats'],
             'permission_callback' => [$this, 'admin_permission'],
         ]);
+
+        // Customer credits (admin) — grant/inspect a customer's prepaid
+        // package balance. See Bookflow_Credits.
+        register_rest_route(self::NAMESPACE, '/customers/(?P<customer_id>\d+)/credits', [
+            [
+                'methods'             => WP_REST_Server::READABLE,
+                'callback'            => [$this, 'get_customer_credits'],
+                'permission_callback' => [$this, 'admin_permission'],
+            ],
+            [
+                'methods'             => WP_REST_Server::CREATABLE,
+                'callback'            => [$this, 'grant_customer_credits'],
+                'permission_callback' => [$this, 'admin_permission'],
+            ],
+        ]);
+
+        // Customer-resource pin (admin) — bind a customer to a resource
+        // (e.g. an assigned instructor). See Bookflow_Resource_Pins.
+        register_rest_route(self::NAMESPACE, '/customers/(?P<customer_id>\d+)/resource-pin', [
+            'methods'             => WP_REST_Server::CREATABLE,
+            'callback'            => [$this, 'pin_customer_resource'],
+            'permission_callback' => [$this, 'admin_permission'],
+        ]);
+
+        // Customer eligibility flags (admin) — set/clear a generic gate
+        // flag. See Bookflow_Customer_Flags.
+        register_rest_route(self::NAMESPACE, '/customers/(?P<customer_id>\d+)/flags', [
+            'methods'             => WP_REST_Server::CREATABLE,
+            'callback'            => [$this, 'set_customer_flag'],
+            'permission_callback' => [$this, 'admin_permission'],
+        ]);
     }
 
     // --- Permissions ---
 
     public function admin_permission($request) {
-        return current_user_can('manage_woocommerce');
+        // A theme/integration can grant equivalent access to a narrower
+        // role (e.g. an "instructor" role that may only manage its own
+        // bookings) by hooking this filter instead of granting the broad
+        // manage_woocommerce capability.
+        return apply_filters('bookflow_rest_admin_permission', current_user_can('manage_woocommerce'), $request);
     }
 
     // --- Bookings ---
@@ -333,6 +374,23 @@ class Bookflow_REST_API {
         }
 
         return rest_ensure_response($this->prepare_booking(Bookflow_Booking::get($request['id'])));
+    }
+
+    public function reschedule_booking($request) {
+        $new_data = [];
+        foreach (['booking_date', 'start_time', 'resource_id', 'schedule_id'] as $key) {
+            if ($request->get_param($key) !== null) {
+                $new_data[$key] = sanitize_text_field($request->get_param($key));
+            }
+        }
+
+        $new_id = Bookflow_Booking::reschedule($request['id'], $new_data);
+
+        if (is_wp_error($new_id)) {
+            return $new_id;
+        }
+
+        return rest_ensure_response($this->prepare_booking(Bookflow_Booking::get($new_id)));
     }
 
     public function delete_booking($request) {
@@ -878,6 +936,16 @@ class Bookflow_REST_API {
             ];
         }, Bookflow_Booking::get_revenue_by_product($args));
 
+        $by_resource = array_map(function ($row) {
+            $resource = Bookflow_Resources::get($row->resource_id);
+            return [
+                'resource_id' => (int) $row->resource_id,
+                'title'       => $resource ? $resource->title : Bookflow_I18n::t('admin.deleted_product'),
+                'revenue'     => (float) $row->revenue,
+                'bookings'    => (int) $row->bookings,
+            ];
+        }, Bookflow_Booking::get_revenue_by_resource($args));
+
         return rest_ensure_response([
             'revenue'        => (float) $revenue->total_revenue,
             'total_bookings' => (int) $revenue->total_bookings,
@@ -885,7 +953,90 @@ class Bookflow_REST_API {
             'by_status'      => $by_status,
             'by_day'         => $by_day,
             'by_product'     => $by_product,
+            'by_resource'    => $by_resource,
         ]);
+    }
+
+    // --- Customer credits / pins / flags ---
+
+    public function get_customer_credits($request) {
+        global $wpdb;
+        $customer_id = absint($request['customer_id']);
+        $credit_type = sanitize_key($request->get_param('credit_type') ?: 'lesson');
+
+        // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- custom table, no core API exists
+        $pools = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}bookflow_customer_credits WHERE customer_id = %d AND credit_type = %s ORDER BY created_at DESC",
+            $customer_id,
+            $credit_type
+        ));
+
+        return rest_ensure_response([
+            'balance' => Bookflow_Credits::get_balance($customer_id, $credit_type),
+            'pools'   => $pools,
+        ]);
+    }
+
+    public function grant_customer_credits($request) {
+        $customer_id = absint($request['customer_id']);
+        $total = absint($request->get_param('total'));
+        if (!$customer_id || !$total) {
+            return new WP_Error('invalid_request', Bookflow_I18n::t('error.invalid_request'), ['status' => 400]);
+        }
+
+        $credit_id = Bookflow_Credits::grant($customer_id, $total, [
+            'product_id'  => $request->get_param('product_id') ? absint($request->get_param('product_id')) : null,
+            'credit_type' => sanitize_key($request->get_param('credit_type') ?: 'lesson'),
+            'expires_at'  => $request->get_param('expires_at') ? sanitize_text_field($request->get_param('expires_at')) : null,
+        ]);
+
+        if (is_wp_error($credit_id)) {
+            return $credit_id;
+        }
+
+        return rest_ensure_response(['credit_id' => $credit_id]);
+    }
+
+    public function pin_customer_resource($request) {
+        $customer_id = absint($request['customer_id']);
+        $resource_id = absint($request->get_param('resource_id'));
+        if (!$customer_id || !$resource_id) {
+            return new WP_Error('invalid_request', Bookflow_I18n::t('error.invalid_request'), ['status' => 400]);
+        }
+
+        $pin_id = Bookflow_Resource_Pins::pin(
+            $customer_id,
+            $resource_id,
+            $request->get_param('product_id') ? absint($request->get_param('product_id')) : null,
+            sanitize_key($request->get_param('role') ?: 'primary')
+        );
+
+        if (is_wp_error($pin_id)) {
+            return $pin_id;
+        }
+
+        return rest_ensure_response(['pin_id' => $pin_id]);
+    }
+
+    public function set_customer_flag($request) {
+        $customer_id = absint($request['customer_id']);
+        $flag_key = sanitize_key($request->get_param('flag_key'));
+        if (!$customer_id || !$flag_key) {
+            return new WP_Error('invalid_request', Bookflow_I18n::t('error.invalid_request'), ['status' => 400]);
+        }
+
+        $ok = Bookflow_Customer_Flags::set(
+            $customer_id,
+            $flag_key,
+            sanitize_text_field($request->get_param('flag_value') ?? '1'),
+            get_current_user_id()
+        );
+
+        if (!$ok) {
+            return new WP_Error('db_error', 'Could not set flag.', ['status' => 500]);
+        }
+
+        return rest_ensure_response(['success' => true]);
     }
 
     // --- Helpers ---

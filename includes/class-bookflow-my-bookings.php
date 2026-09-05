@@ -169,7 +169,7 @@ class Bookflow_My_Bookings {
             wp_die(esc_html(Bookflow_I18n::t('error.cannot_cancel')));
         }
 
-        $result = Bookflow_Booking::transition_status($booking_id, 'cancelled', 'Cancelled by customer');
+        $result = Bookflow_Booking::transition_status($booking_id, 'cancelled', 'Cancelled by customer', ['cancelled_by' => 'customer']);
 
         if (is_wp_error($result)) {
             wp_die(esc_html($result->get_error_message()));

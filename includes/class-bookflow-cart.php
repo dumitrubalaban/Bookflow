@@ -487,6 +487,16 @@ class Bookflow_Cart {
     private function update_bookings_status($order_id, $status) {
         $bookings = Bookflow_Booking::query(['order_id' => $order_id]);
         foreach ($bookings as $booking) {
+            // A product can opt out of payment-driven auto-confirmation
+            // (`_bookflow_requires_manual_approval`) so a booking stays
+            // 'pending' — regardless of the order's own payment status —
+            // until staff explicitly approve or reject it. Payment capture
+            // ('paid'/'partially-paid'/'cancelled'/'refunded') still applies
+            // normally; only the 'confirmed' transition is gated.
+            if ($status === 'confirmed' && get_post_meta($booking->product_id, '_bookflow_requires_manual_approval', true)) {
+                continue;
+            }
+
             // A deposit booking that just got its payment captured is only
             // "partially-paid", not fully "paid" — the balance is still due
             // on-site. Only applies to the 'paid' transition (order going to
@@ -495,7 +505,23 @@ class Bookflow_Cart {
             if ($status === 'paid' && (float) $booking->deposit_amount > 0 && $booking->status !== 'partially-paid') {
                 $target = 'partially-paid';
             }
-            Bookflow_Booking::transition_status($booking->id, $target);
+            $context = $target === 'cancelled' ? ['cancelled_by' => 'system'] : [];
+            Bookflow_Booking::transition_status($booking->id, $target, '', $context);
         }
+    }
+
+    /**
+     * Staff-facing approval/rejection for a product with
+     * `_bookflow_requires_manual_approval` enabled — the counterpart to the
+     * auto-confirm this class normally does on order completion.
+     *
+     * @return true|WP_Error
+     */
+    public static function approve_booking($booking_id) {
+        return Bookflow_Booking::transition_status($booking_id, 'confirmed');
+    }
+
+    public static function reject_booking($booking_id, $reason = '') {
+        return Bookflow_Booking::transition_status($booking_id, 'rejected', $reason);
     }
 }

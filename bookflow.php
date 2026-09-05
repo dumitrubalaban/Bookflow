@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 }
 
 define('BOOKFLOW_VERSION', '1.0.0');
-define('BOOKFLOW_DB_VERSION', '1.12.0');
+define('BOOKFLOW_DB_VERSION', '1.14.0');
 define('BOOKFLOW_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('BOOKFLOW_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('BOOKFLOW_PLUGIN_FILE', __FILE__);
@@ -34,11 +34,12 @@ define('BOOKFLOW_STATUSES', [
     'cancelled'     => 'Cancelled',
     'refunded'      => 'Refunded',
     'no-show'       => 'No Show',
+    'rejected'      => 'Rejected',
 ]);
 
 // Status transitions: status => [allowed next statuses]
 define('BOOKFLOW_STATUS_TRANSITIONS', [
-    'pending'         => ['confirmed', 'cancelled', 'paid', 'partially-paid'],
+    'pending'         => ['confirmed', 'rejected', 'cancelled', 'paid', 'partially-paid'],
     'confirmed'       => ['paid', 'cancelled', 'no-show', 'partially-paid'],
     'partially-paid'  => ['paid', 'confirmed', 'cancelled', 'refunded'],
     'paid'            => ['confirmed', 'in-progress', 'cancelled', 'refunded'],
@@ -47,6 +48,7 @@ define('BOOKFLOW_STATUS_TRANSITIONS', [
     'cancelled'       => ['pending'],
     'refunded'        => [],
     'no-show'         => ['refunded'],
+    'rejected'        => ['pending'],
 ]);
 
 /**
@@ -94,6 +96,12 @@ function bookflow_init() {
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-abandoned.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-waitlist.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-webhooks.php';
+    require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-credits.php';
+    require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-resource-pins.php';
+    require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-booking-resources.php';
+    require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-customer-flags.php';
+    require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-booking-notes.php';
+    require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-customer-documents.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-locations.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-widgets.php';
     require_once BOOKFLOW_PLUGIN_DIR . 'includes/class-bookflow-schedules.php';
@@ -158,6 +166,9 @@ function bookflow_init() {
     new Bookflow_Abandoned();
     new Bookflow_Waitlist();
     new Bookflow_Webhooks();
+    new Bookflow_Credits();
+    new Bookflow_Resource_Pins();
+    new Bookflow_Customer_Flags();
     new Bookflow_Person_Types();
     new Bookflow_Cart();
     new Bookflow_Ajax();

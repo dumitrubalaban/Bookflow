@@ -38,6 +38,7 @@ class Bookflow_Install {
             full_total decimal(12,2) NOT NULL DEFAULT 0.00,
             deposit_amount decimal(12,2) NOT NULL DEFAULT 0.00,
             status varchar(20) NOT NULL DEFAULT 'pending',
+            cancelled_by varchar(20) DEFAULT NULL,
             customer_name varchar(255) DEFAULT NULL,
             customer_email varchar(255) DEFAULT NULL,
             customer_phone varchar(50) DEFAULT NULL,
@@ -313,6 +314,138 @@ class Bookflow_Install {
             PRIMARY KEY (id),
             KEY product_id (product_id),
             KEY is_default (is_default)
+        ) $charset_collate;");
+
+        // Customer credits — generic "package with a remaining balance"
+        // ledger (e.g. a bundle of prepaid sessions). credit_type is a
+        // free-text label the integrator defines (e.g. "lesson", "visit");
+        // Bookflow core never inspects its value.
+        dbDelta("CREATE TABLE {$wpdb->prefix}bookflow_customer_credits (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            customer_id bigint(20) unsigned NOT NULL,
+            product_id bigint(20) unsigned DEFAULT NULL,
+            credit_type varchar(50) NOT NULL DEFAULT 'lesson',
+            total int(11) NOT NULL DEFAULT 0,
+            remaining int(11) NOT NULL DEFAULT 0,
+            expires_at datetime DEFAULT NULL,
+            status varchar(20) NOT NULL DEFAULT 'active',
+            created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY customer_id (customer_id),
+            KEY product_id (product_id),
+            KEY status (status),
+            KEY customer_type_status (customer_id, credit_type, status)
+        ) $charset_collate;");
+
+        // Credit transactions — audit ledger of every consume/refund/grant
+        // against a credit pool, keyed to the booking that caused it so
+        // consumption and refunds are idempotent (never double-applied for
+        // the same booking).
+        dbDelta("CREATE TABLE {$wpdb->prefix}bookflow_credit_transactions (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            credit_id bigint(20) unsigned NOT NULL,
+            booking_id bigint(20) unsigned DEFAULT NULL,
+            delta int(11) NOT NULL DEFAULT 0,
+            type varchar(20) NOT NULL DEFAULT 'consume',
+            note varchar(255) DEFAULT NULL,
+            created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY credit_booking_type (credit_id, booking_id, type),
+            KEY credit_id (credit_id),
+            KEY booking_id (booking_id)
+        ) $charset_collate;");
+
+        // Customer-resource pins — a persistent binding of a customer to a
+        // specific resource (e.g. "this customer's assigned provider"),
+        // scoped per product (or globally when product_id is NULL). `role`
+        // lets more than one pin exist per customer/product (e.g. two
+        // different resource roles pinned independently).
+        dbDelta("CREATE TABLE {$wpdb->prefix}bookflow_customer_resource_pins (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            customer_id bigint(20) unsigned NOT NULL,
+            product_id bigint(20) unsigned DEFAULT NULL,
+            resource_id bigint(20) unsigned NOT NULL,
+            role varchar(30) NOT NULL DEFAULT 'primary',
+            created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY customer_product_role (customer_id, product_id, role),
+            KEY customer_id (customer_id),
+            KEY resource_id (resource_id)
+        ) $charset_collate;");
+
+        // Booking resources — generalizes bookflow_bookings.resource_id
+        // (a single resource) into a many-to-many so one booking can require
+        // several resources to simultaneously be free (e.g. a room AND a
+        // piece of equipment). The legacy single resource_id column is kept
+        // in sync for backward compatibility with existing availability
+        // queries that only understand one resource per booking.
+        dbDelta("CREATE TABLE {$wpdb->prefix}bookflow_booking_resources (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            booking_id bigint(20) unsigned NOT NULL,
+            resource_id bigint(20) unsigned NOT NULL,
+            role varchar(30) NOT NULL DEFAULT 'primary',
+            created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY booking_resource (booking_id, resource_id),
+            KEY booking_id (booking_id),
+            KEY resource_id (resource_id)
+        ) $charset_collate;");
+
+        // Customer flags — a generic per-customer key/value eligibility flag
+        // (e.g. "is this customer allowed to book product X yet?"). Bookflow
+        // core only reads/writes flag_key/flag_value as opaque strings; the
+        // integrator decides what a given key means and where it's checked
+        // via the bookflow_is_product_bookable_for_customer filter.
+        dbDelta("CREATE TABLE {$wpdb->prefix}bookflow_customer_flags (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            customer_id bigint(20) unsigned NOT NULL,
+            flag_key varchar(60) NOT NULL,
+            flag_value varchar(255) NOT NULL DEFAULT '1',
+            set_by bigint(20) unsigned DEFAULT NULL,
+            created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY customer_flag (customer_id, flag_key),
+            KEY customer_id (customer_id)
+        ) $charset_collate;");
+
+        // Booking notes — freeform or structured (JSON) notes attached to a
+        // booking (e.g. a coach's session notes, a progress checklist). The
+        // shape of `structured_data` and the meaning of `note_type` are
+        // entirely up to the integrator; Bookflow only stores and retrieves.
+        dbDelta("CREATE TABLE {$wpdb->prefix}bookflow_booking_notes (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            booking_id bigint(20) unsigned NOT NULL,
+            author_id bigint(20) unsigned DEFAULT NULL,
+            note_type varchar(30) NOT NULL DEFAULT 'note',
+            note_text text DEFAULT NULL,
+            structured_data longtext DEFAULT NULL,
+            visible_to_customer tinyint(1) NOT NULL DEFAULT 0,
+            created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY booking_id (booking_id),
+            KEY note_type (note_type)
+        ) $charset_collate;");
+
+        // Customer documents — files (ID scans, certificates, signed
+        // waivers, etc.) a customer or staff attaches to a customer profile,
+        // with a lightweight verification workflow. `doc_type` is an opaque
+        // integrator-defined key (e.g. "id_card", "medical_cert").
+        dbDelta("CREATE TABLE {$wpdb->prefix}bookflow_customer_documents (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            customer_id bigint(20) unsigned NOT NULL,
+            doc_type varchar(60) NOT NULL,
+            file_id bigint(20) unsigned NOT NULL,
+            status varchar(20) NOT NULL DEFAULT 'pending',
+            uploaded_by bigint(20) unsigned DEFAULT NULL,
+            verified_by bigint(20) unsigned DEFAULT NULL,
+            verified_at datetime DEFAULT NULL,
+            created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY customer_id (customer_id),
+            KEY doc_type (doc_type),
+            KEY status (status)
         ) $charset_collate;");
 
         update_option('bookflow_db_version', BOOKFLOW_DB_VERSION);

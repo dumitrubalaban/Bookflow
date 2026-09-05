@@ -46,6 +46,43 @@ Bookflow fires actions and filters at every stage of the booking lifecycle, so y
 | `bookflow_lang_dropdown_id` | Change the DOM id Bookflow looks for as the language dropdown | `$id` |
 | `bookflow_spots_element_id` | Change the DOM id Bookflow uses to render "spots left" | `$id` |
 
+### Credits, resource pins, flags, notes, documents
+
+These generic mechanisms let an integrator model "package with a remaining balance", "assigned provider", "eligibility gate", "session notes", and "verified documents" without any driving-school (or other vertical) specifics living in Bookflow itself — see `Bookflow_Credits`, `Bookflow_Resource_Pins`, `Bookflow_Customer_Flags`, `Bookflow_Booking_Notes`, `Bookflow_Customer_Documents`, and `Bookflow_Booking_Resources`.
+
+| Hook | Purpose | Arguments |
+|---|---|---|
+| `bookflow_credit_consumed` | A credit unit was consumed from a pool | `$credit_id`, `$booking_id`, `$amount` |
+| `bookflow_credit_refunded` | Credit(s) for a booking were refunded | `$booking_id` |
+| `bookflow_credit_should_refund_on_cancel` (filter) | Decide whether a cancelled booking's consumed credit is refunded or forfeited | `$should_refund` (bool, default true), `$booking_id`, `$booking` |
+| `bookflow_bookable_resources_for_product` (filter) | Narrow the resource list a customer is offered for a product — this is where `Bookflow_Resource_Pins` restricts the list to a customer's pinned resource(s) | `$resources`, `$product_id` |
+| `bookflow_is_product_bookable_for_customer` (filter) | Generic eligibility gate checked in `Bookflow_Booking::create()` before any booking is created | `$bookable` (bool), `$product_id`, `$customer_id` |
+| `bookflow_customer_flag_set` | A customer flag was set | `$customer_id`, `$flag_key`, `$flag_value` |
+| `bookflow_booking_note_added` | A note (freeform or structured) was attached to a booking | `$note_id`, `$booking_id`, `$args` |
+| `bookflow_customer_document_added` / `bookflow_customer_document_status_changed` | A customer document was uploaded / its verification status changed | `$doc_id`, `$customer_id`, `$doc_type` / `$doc_id`, `$status` |
+| `bookflow_rest_admin_permission` (filter) | Grant REST API staff-endpoint access to a narrower role than `manage_woocommerce` (e.g. an "instructor" role) | `$allowed` (bool), `$request` |
+
+Two product-level meta keys change core `Bookflow_Booking::create()` / status behavior directly (no hook needed):
+
+| Meta key | Effect |
+|---|---|
+| `_bookflow_credit_type` | Booking confirmation auto-consumes one credit of this type from the customer's balance; cancellation auto-refunds it (unless `bookflow_credit_should_refund_on_cancel` returns false) |
+| `_bookflow_max_active_bookings_per_customer` | Caps how many pending/confirmed bookings one customer may hold for this product at once |
+| `_bookflow_requires_flag` / `_bookflow_requires_flag_value` | Gates booking behind a customer flag (optionally a specific value) via `Bookflow_Customer_Flags` |
+| `_bookflow_requires_manual_approval` | Booking stays `pending` on order completion instead of auto-confirming; a staff role must call the `/bookings/{id}/status` REST endpoint (or `Bookflow_Cart::approve_booking()` / `reject_booking()`) |
+
+### Cancellation attribution, reschedule, per-resource reporting
+
+| Hook | Purpose | Arguments |
+|---|---|---|
+| `bookflow_booking_rescheduled` | A booking was moved to a new slot via `Bookflow_Booking::reschedule()` | `$old_booking_id`, `$new_booking_id` |
+
+`Bookflow_Booking::transition_status($id, 'cancelled', $note, ['cancelled_by' => 'customer'\|'staff'\|'system'\|'reschedule'])` records who initiated a cancellation on `$booking->cancelled_by`. Use it inside `bookflow_credit_should_refund_on_cancel` (or your own reporting) to key a refund/forfeit policy on who cancelled and how late — e.g. always refund a staff-initiated cancel, only refund a customer cancel outside the cutoff window.
+
+`Bookflow_Booking::reschedule($booking_id, $new_data)` moves a booking to a new date/time/resource atomically: it re-keys any already-consumed credit ledger entry to the new booking id (so reschedule never double-consumes or wrongly refunds a credit), then cancels the original with `cancelled_by = 'reschedule'`.
+
+`Bookflow_Booking::get_revenue_by_resource($args)` (also exposed as `by_resource` in the `/stats` REST response) gives a per-resource revenue/booking-count breakdown — e.g. per-instructor or per-room utilization reporting — the same shape as the existing per-product breakdown.
+
 ## Building a custom front-end
 
 Bookflow also exposes a full REST API under the `bookflow/v1` namespace (bookings, availability, schedules, resources, reservations). Combined with `bookflow_render_default_widget`, you can disable the built-in widget UI entirely and build your own booking calendar/interface in any framework, while Bookflow's PHP backend continues to own all booking logic, validation, and state.
