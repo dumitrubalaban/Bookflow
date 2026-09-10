@@ -265,6 +265,23 @@ class Bookflow_Admin {
                                     <th><?php Bookflow_I18n::te('admin.cost'); ?></th>
                                     <td><strong><?php echo wp_kses_post(wc_price($booking->cost)); ?></strong></td>
                                 </tr>
+                                <?php
+                                // full_total covers the whole order (booking cost plus any
+                                // theme-added extras, e.g. Cricova's souvenir add-on, which
+                                // Bookflow itself has no concept of — see the theme's
+                                // _bookflow_full_total item-meta docblock). 'cost' above is
+                                // always just this booking's own line item, so the two only
+                                // ever match when nothing else was added to the order; only
+                                // showing this row when they differ keeps the common case
+                                // (no extras) from displaying the same number twice.
+                                $full_total = (float) $booking->full_total;
+                                if ($full_total > 0 && abs($full_total - (float) $booking->cost) > 0.01) :
+                                ?>
+                                <tr>
+                                    <th><?php Bookflow_I18n::te('admin.total'); ?></th>
+                                    <td><strong><?php echo wp_kses_post(wc_price($full_total)); ?></strong></td>
+                                </tr>
+                                <?php endif; ?>
                                 <?php if (!empty($booking->deposit_amount) && (float) $booking->deposit_amount > 0) : ?>
                                 <tr>
                                     <th><?php Bookflow_I18n::te('cart.deposit_paid_now'); ?></th>
