@@ -130,7 +130,13 @@ class Bookflow_Bookings_List_Table extends WP_List_Table {
     }
 
     protected function column_total($item) {
-        $html = wp_kses_post(wc_price($item->cost));
+        // full_total covers the whole order — booking cost plus any
+        // theme-added extras Bookflow itself has no concept of (e.g.
+        // Cricova's souvenir add-on, set via the _bookflow_full_total item
+        // meta). Falls back to cost for older rows created before that
+        // meta existed, where full_total was never populated (0).
+        $display_total = (float) $item->full_total > 0 ? $item->full_total : $item->cost;
+        $html = wp_kses_post(wc_price($display_total));
         if (!empty($item->deposit_amount) && (float) $item->deposit_amount > 0) {
             $balance = (float) $item->full_total - (float) $item->deposit_amount;
             $html .= '<br><small style="color:#d9534f;">' . esc_html(Bookflow_I18n::t('cart.balance_due')) . ': ' . wp_kses_post(wc_price($balance)) . '</small>';
@@ -306,7 +312,13 @@ class Bookflow_Bookings_List_Table extends WP_List_Table {
         $args['limit']  = $per_page;
         $args['offset'] = ($current_page - 1) * $per_page;
 
-        $orderby = sanitize_text_field(wp_unslash($_GET['orderby'] ?? 'booking_date')); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only sort param, no state change
+        // Default to newest-created first (id desc), not booking_date — that
+        // sorts by which tour is furthest in the future, not by when the
+        // booking was actually made, so a booking made seconds ago for a
+        // near-term date could rank below an older booking for a
+        // further-out date. Explicit column-header clicks still work as
+        // before via $_GET['orderby'].
+        $orderby = sanitize_text_field(wp_unslash($_GET['orderby'] ?? 'id')); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only sort param, no state change
         $order   = sanitize_text_field(wp_unslash($_GET['order'] ?? 'desc')); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only sort param, no state change
         $args['orderby'] = $orderby;
         $args['order']   = $order;
