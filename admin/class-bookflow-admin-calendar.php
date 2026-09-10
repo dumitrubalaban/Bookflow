@@ -73,6 +73,15 @@ class Bookflow_Admin_Calendar {
             'statusLabels'   => Bookflow_I18n::statuses(),
             'products'       => $products,
             'bookingsListUrl' => admin_url('admin.php?page=bookflow-bookings'),
+            // Base for linking a booking's order number straight to the WC
+            // order edit screen from the calendar's detail panel — HPOS
+            // (wc_orders admin page) and legacy post-based orders use
+            // different admin URLs, so build it the way WooCommerce itself
+            // recommends rather than hardcoding post.php.
+            'orderEditUrlBase' => (class_exists('\Automattic\WooCommerce\Utilities\OrderUtil')
+                    && \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled())
+                ? add_query_arg(['action' => 'edit', 'id' => ''], admin_url('admin.php?page=wc-orders'))
+                : admin_url('post.php?action=edit&post='),
             'i18n'           => [
                 'today'      => Bookflow_I18n::t('admin.today'),
                 'more'       => Bookflow_I18n::t('admin.more'),

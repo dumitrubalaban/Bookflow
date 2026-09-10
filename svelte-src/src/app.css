@@ -77,6 +77,17 @@
     min-width: 0 !important;
 }
 
+/* Step headings use the host site's display serif when it's loaded, falling back to a generic serif elsewhere so
+   this never renders in a missing/blank font on a site that doesn't have
+   it. Kept separate from the body font (Tailwind's default sans, or the
+   widget's own `fontFamily` style var) so headings read as a deliberate
+   display treatment rather than just larger body text. */
+.bf-step-heading {
+    font-family: 'Cormorant', Georgia, serif;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+}
+
 @keyframes bookflow-shake {
     0%, 100% { transform: translateX(0); }
     25% { transform: translateX(-6px); }

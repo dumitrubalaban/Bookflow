@@ -132,6 +132,29 @@ class Bookflow_Frontend {
         }
         $script_handle = $using_svelte ? 'bookflow-widget' : 'bookflow-booking';
 
+        wp_localize_script($script_handle, 'bookflowBooking', self::get_widget_config($product));
+    }
+
+    /**
+     * Every piece of data a booking UI needs for $product: availability
+     * config (schedules/resources/person types/extras), pricing/i18n
+     * strings, and the resolved Widget Builder style. This is the single
+     * source of truth Bookflow's own widget localizes into `bookflowBooking`
+     * — pulled out into its own public method (rather than inlined in
+     * enqueue_for_product()) specifically so a theme building its OWN
+     * booking UI from scratch (custom markup/CSS, Bookflow only supplying
+     * data + the admin-ajax/REST endpoints) can call this instead of
+     * re-deriving the same shape by hand and quietly drifting out of sync
+     * every time a new feature (extras, locations, deposits, waitlist...)
+     * is added here.
+     *
+     * A theme can also hook `bookflow_widget_config` to override or add to
+     * this array — e.g. swap in its own translated strings, add fields — without
+     * forking this method.
+     */
+    public static function get_widget_config($product) {
+        $product_id = $product->get_id();
+
         $has_person_types = Bookflow_Person_Types::product_has_types($product_id);
         $person_types = $has_person_types ? Bookflow_Person_Types::get_for_product($product_id) : [];
         $has_resources = $product->has_resources();
@@ -298,7 +321,18 @@ class Bookflow_Frontend {
             $localize_data['i18n'] = array_merge($localize_data['i18n'], $widget_config['text']);
         }
 
-        wp_localize_script($script_handle, 'bookflowBooking', $localize_data);
+        /**
+         * Filters the full config a booking UI localizes for $product —
+         * the same array Bookflow's own widget uses. A theme building a
+         * fully custom booking UI can hook this to override/add fields
+         * without touching plugin code, e.g.:
+         *
+         *     add_filter('bookflow_widget_config', function ($config, $product) {
+         *         $config['i18n']['stepLanguage'] = my_theme_translate('...');
+         *         return $config;
+         *     }, 10, 2);
+         */
+        return apply_filters('bookflow_widget_config', $localize_data, $product);
     }
 
     /**

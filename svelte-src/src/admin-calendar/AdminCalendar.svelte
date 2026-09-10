@@ -20,6 +20,7 @@
     let loading = false;
     let error = '';
     let selected = null; // booking object shown in the side panel
+    let selectedDay = null; // { date, day, items } shown in the "day overflow" popover
     let statusUpdating = false;
 
     // === View mode: Month (overview) / Week (Google-Calendar-style grid) ===
@@ -188,6 +189,24 @@
     function closePanel() {
         selected = null;
         document.body.style.overflow = '';
+    }
+
+    // Month-view day cells only render the first 3 bookings inline (limited
+    // vertical space) and used to show a plain "+N more" label with no way
+    // to actually see the rest — clicking it did nothing. This opens a
+    // small popover listing every booking for that day; clicking a row
+    // opens it in the existing detail side panel above.
+    function openDay(cell) {
+        selectedDay = cell;
+        document.body.style.overflow = 'hidden';
+    }
+    function closeDayPanel() {
+        selectedDay = null;
+        document.body.style.overflow = '';
+    }
+    function openBookingFromDay(b) {
+        selectedDay = null;
+        openBooking(b);
     }
 
     function updateStatus(newStatus) {
@@ -427,7 +446,10 @@
                             </button>
                             {/each}
                             {#if cell.items.length > 3}
-                            <span class="px-1.5 text-[10px] text-gray-500">+{cell.items.length - 3} {config.i18n.more}</span>
+                            <button type="button" on:click={() => openDay(cell)}
+                                    class="appearance-none border-0 bg-transparent px-1.5 text-left text-[10px] font-medium text-bf-admin-accent-dark underline-offset-2 hover:underline">
+                                +{cell.items.length - 3} {config.i18n.more}
+                            </button>
                             {/if}
                         </div>
                     </div>
@@ -445,6 +467,30 @@
         {/each}
     </div>
 </div>
+
+{#if selectedDay}
+<div class="fixed inset-0 z-[100000] bg-black/40" on:click={closeDayPanel} on:keydown={(e) => e.key === 'Escape' && closeDayPanel()} role="presentation" transition:fade={{ duration: 180 }}></div>
+<div class="fixed left-1/2 top-1/2 z-[100001] flex max-h-[80vh] w-full max-w-sm -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg bg-white shadow-2xl" transition:fly={{ y: 12, duration: 220, easing: cubicOut }}>
+    <div class="flex shrink-0 items-center justify-between border-b border-gray-100 px-5 py-4">
+        <h3 class="text-sm font-semibold text-gray-900">{selectedDay.date} — {selectedDay.items.length} {config.i18n.more}</h3>
+        <button type="button" on:click={closeDayPanel}
+                class="flex h-8 w-8 shrink-0 appearance-none items-center justify-center rounded-full border-0 bg-gray-100 text-gray-500 outline-none transition-colors hover:bg-gray-200 hover:text-gray-700">
+            <X size={16} />
+        </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-2">
+        {#each [...selectedDay.items].sort((a, b) => a.start_time.localeCompare(b.start_time)) as b (b.id)}
+        <button type="button" on:click={() => openBookingFromDay(b)}
+                class="flex w-full appearance-none items-center gap-2 rounded-md border-0 bg-transparent px-3 py-2 text-left text-sm transition-colors hover:bg-gray-50">
+            <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-sm" style:background-color={statusColor(b.status)}></span>
+            <span class="shrink-0 font-medium text-gray-900">{b.start_time}</span>
+            <span class="truncate text-gray-600">{b.customer_name || (b.product ? b.product.name : '#' + b.id)}</span>
+            <span class="ml-auto shrink-0 text-xs text-gray-400">{b.persons_total} pax</span>
+        </button>
+        {/each}
+    </div>
+</div>
+{/if}
 
 {#if selected}
 <div class="fixed inset-0 z-[100000] bg-black/40" on:click={closePanel} on:keydown={(e) => e.key === 'Escape' && closePanel()} role="presentation" transition:fade={{ duration: 180 }}></div>
@@ -474,20 +520,33 @@
         <div class="mb-6 flex flex-col gap-3.5 text-sm">
             <div class="flex items-center gap-3 text-gray-700">
                 <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-50 text-gray-400"><Clock size={15} /></span>
-                {selected.booking_date} &middot; {selected.start_time}
+                {selected.booking_date} &middot; {selected.start_time}{selected.end_time ? ' – ' + selected.end_time : ''}
             </div>
             <div class="flex items-center gap-3 text-gray-700">
                 <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-50 text-gray-400"><User size={15} /></span>
-                {selected.customer_name || '—'}{selected.customer_phone ? ' · ' + selected.customer_phone : ''}
+                <span class="min-w-0">
+                    <span class="block truncate">{selected.customer_name || '—'}{selected.customer_phone ? ' · ' + selected.customer_phone : ''}</span>
+                    {#if selected.customer_email}<span class="block truncate text-xs text-gray-500">{selected.customer_email}</span>{/if}
+                </span>
             </div>
             <div class="flex items-center gap-3 text-gray-700">
                 <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-50 text-gray-400"><UsersIcon size={15} /></span>
                 {selected.persons_total} {selected.persons_total === 1 ? config.i18n.person : config.i18n.persons}
+                {#if selected.cost}<span class="ml-1 text-gray-400">&middot; {selected.cost} {selected.currency_symbol || ''}</span>{/if}
             </div>
             {#if selected.resource}
             <div class="flex items-center gap-3 text-gray-700">
                 <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-50 text-gray-400"><Package size={15} /></span>
                 {selected.resource.title}
+            </div>
+            {/if}
+            {#if selected.order_id || selected.created_at}
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 pl-11 text-xs text-gray-400">
+                {#if selected.order_id}
+                <a href={config.orderEditUrlBase ? config.orderEditUrlBase + selected.order_id : '#'}
+                   class="font-medium text-bf-admin-accent-dark hover:underline">#{selected.order_id}</a>
+                {/if}
+                {#if selected.created_at}<span>{selected.created_at}</span>{/if}
             </div>
             {/if}
         </div>

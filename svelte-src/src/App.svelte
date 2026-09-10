@@ -732,33 +732,25 @@
 
     {#if currentStep === 'language'}
     <div>
-        <h3 class="mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.stepLanguage}</h3>
+        <h3 class="bf-step-heading mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.stepLanguage}</h3>
         <input type="hidden" id="bookflow-language" value={langSelectedValue}>
-        <div class="relative">
-            <button type="button" on:click={() => langOpen = !langOpen}
-                    class="flex w-full items-center justify-between rounded-md border border-bf-border bg-bf-bg-alt px-4 py-3 text-left transition-colors hover:border-bf-accent/50">
-                <span class={langSelectedLabel ? 'text-gray-900' : 'text-gray-400'}>{langSelectedLabel || i18n.selectOption || i18n.selectSchedule}</span>
-                <ChevronRight size={18} class="transition-transform duration-200 {langOpen ? 'rotate-90' : ''} text-gray-500" />
+        <div class="flex flex-col gap-3">
+            {#each uniqueLangOptions as opt}
+            {@const selected = langSelectedValue === opt.value}
+            <button type="button" on:click={() => pickLanguage(opt)}
+                    class="flex w-full items-center justify-between rounded-md border px-5 py-3 text-left transition-colors duration-150
+                        {selected ? 'border-bf-accent bg-bf-accent/10' : 'border-bf-border bg-bf-bg-alt hover:border-bf-accent/50'}">
+                <span class="font-semibold {selected ? 'text-bf-accent' : 'text-gray-900'}">{opt.label}</span>
+                {#if selected}<Check size={16} class="text-bf-accent" />{/if}
             </button>
-            {#if langOpen}
-            <div class="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-bf-border bg-bf-bg-alt shadow-sm">
-                {#each uniqueLangOptions as opt}
-                <button type="button" on:click={() => pickLanguage(opt)}
-                        class="flex w-full items-center justify-between px-5 py-3 text-left transition-colors hover:bg-bf-accent/15
-                            {langSelectedValue === opt.value ? 'bg-bf-accent/10' : 'bg-transparent'}">
-                    <span class={langSelectedValue === opt.value ? 'text-bf-accent' : 'text-gray-900'}>{opt.label}</span>
-                    {#if langSelectedValue === opt.value}<Check size={16} class="text-bf-accent" />{/if}
-                </button>
-                {/each}
-            </div>
-            {/if}
+            {/each}
         </div>
     </div>
     {/if}
 
     {#if currentStep === 'location'}
     <div>
-        <h3 class="mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.selectLocation}</h3>
+        <h3 class="bf-step-heading mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.selectLocation}</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 transition-opacity {locationSwapping ? 'opacity-40 pointer-events-none' : ''}">
             {#if locationsLoading}
                 <div class="col-span-full flex flex-col items-center justify-center gap-3 py-10 text-gray-500">
@@ -784,7 +776,7 @@
 
     {#if currentStep === 'day'}
     <div>
-        <h3 class="mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.selectDate}</h3>
+        <h3 class="bf-step-heading mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.selectDate}</h3>
         <div class="max-w-xs mx-auto rounded-lg border border-bf-border bg-bf-bg-alt p-3 sm:p-4">
             <div class="mb-3 flex items-center justify-between">
                 <button type="button" on:click={() => changeMonth(-1)} class="flex h-7 w-7 items-center justify-center rounded-md border border-bf-border bg-transparent transition-colors hover:border-bf-accent hover:text-bf-accent"><ChevronLeft size={14} class="text-gray-600" /></button>
@@ -821,7 +813,7 @@
 
     {#if currentStep === 'staff'}
     <div>
-        <h3 class="mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.selectResource}</h3>
+        <h3 class="bf-step-heading mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.selectResource}</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {#if resourcesLoading}
                 <div class="col-span-full flex flex-col items-center justify-center gap-3 py-10 text-gray-500">
@@ -860,7 +852,7 @@
 
     {#if currentStep === 'time'}
     <div>
-        <h3 class="mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.selectTime}</h3>
+        <h3 class="bf-step-heading mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.selectTime}</h3>
         <div>
             {#if slotsLoading}
                 <div class="flex flex-col items-center justify-center gap-3 py-10 text-gray-500">
@@ -871,16 +863,16 @@
             {:else if !slots.length}
                 <p class="py-6 text-center text-gray-500">{i18n.noSlots}</p>
             {:else}
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div class="flex flex-col gap-3">
                     {#each slots as slot (slot.time)}
                     {@const selected = selectedSlot === slot.time}
-                    <div class={slot.is_full ? 'col-span-2 sm:col-span-3' : ''}>
+                    <div>
                     <button type="button" disabled={slot.is_full} on:click={() => selectSlot(slot)}
-                            class="w-full rounded-md border px-4 py-3 text-center transition-colors duration-150
+                            class="flex w-full items-center justify-between rounded-md border px-5 py-3 text-left transition-colors duration-150
                                 {slot.is_full ? 'border-bf-border/50 text-gray-300 cursor-not-allowed' : 'hover:border-bf-accent/50'}
                                 {selected ? 'border-bf-accent bg-bf-accent/10' : 'border-bf-border bg-bf-bg-alt'}">
-                        <span class="block font-semibold {slot.is_full ? 'text-gray-300' : selected ? 'text-bf-accent' : 'text-gray-900'}">{slot.time}</span>
-                        <span class="block text-xs text-gray-400 mt-0.5">
+                        <span class="font-semibold {slot.is_full ? 'text-gray-300' : selected ? 'text-bf-accent' : 'text-gray-900'}">{slot.time}</span>
+                        <span class="text-xs text-gray-400">
                             {slot.is_full ? (i18n.soldOut || 'Sold out') : (i18n.spotsOfMax || '%d of %d available').replace('%d', slot.available).replace('%d', slot.max_persons)}
                         </span>
                     </button>
@@ -924,7 +916,7 @@
     {#if currentStep === 'persons'}
     <div>
         {#if cfg.hasPersonTypes}
-        <h3 class="mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.participants}</h3>
+        <h3 class="bf-step-heading mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.participants}</h3>
         <div class="flex flex-col gap-3">
             {#each (cfg.personTypes || []) as pt, i (pt.id)}
             <div class="flex items-center justify-between rounded-md border border-bf-border bg-bf-bg-alt px-4 py-3.5">
@@ -941,7 +933,7 @@
             {/each}
         </div>
         {:else}
-        <h3 class="mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.numberOfPersons}</h3>
+        <h3 class="bf-step-heading mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.numberOfPersons}</h3>
         <div class="inline-flex items-stretch rounded-md border border-bf-border bg-bf-bg overflow-hidden">
             <button type="button" on:click={() => setPersons(persons - 1)} class="flex h-10 w-10 items-center justify-center border-0 bg-transparent p-0 appearance-none transition-colors hover:bg-bf-accent/10"><Minus size={16} class="text-gray-700" /></button>
             <span class="flex w-10 items-center justify-center border-x border-bf-border text-base font-semibold">{persons}</span>
@@ -956,7 +948,7 @@
 
     {#if currentStep === 'contact'}
     <div>
-        <h3 class="mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.contactDetails}</h3>
+        <h3 class="bf-step-heading mb-5 border-b border-bf-border pb-3 text-sm font-bold uppercase tracking-widest text-bf-accent">{i18n.contactDetails}</h3>
         <div class="flex flex-col gap-4 max-w-lg">
             <div>
                 <label for="bookflow-customer-name" class="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">{i18n.fullName}</label>
